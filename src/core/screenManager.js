@@ -44,6 +44,9 @@ export class ScreenManager {
     if (!next.mounted) {
       next.instance = next.factory(next.el, this.ctx) || null;
       next.mounted = true;
+    } else {
+      // Экран уже смонтирован — даём ему шанс пересобраться
+      next.instance?.onShow?.();
     }
 
     next.el.classList.add('is-active');

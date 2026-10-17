@@ -1,0 +1,227 @@
+/* ==========================================================================
+   Главное меню ReactION — логотип-ион и фон
+   ========================================================================== */
+
+#screen-menu {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(242, 208, 104, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 120%, rgba(30, 37, 48, 0.9) 0%, transparent 60%),
+    linear-gradient(180deg, #12161d 0%, #1e2530 100%);
+}
+
+/* --- Анимированный фон: плавающие молекулы/формулы --- */
+#screen-menu::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background-image:
+    radial-gradient(circle, rgba(242, 208, 104, 0.16) 1.5px, transparent 1.5px),
+    radial-gradient(circle, rgba(242, 208, 104, 0.09) 1px, transparent 1px);
+  background-size: 140px 140px, 90px 90px;
+  background-position: 0 0, 40px 60px;
+  animation: driftField 60s linear infinite;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+@keyframes driftField {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-140px, -140px); }
+}
+
+/* --- Свечение-лампа сверху --- */
+#screen-menu::after {
+  content: '';
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  width: 60vw;
+  height: 60vh;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(255, 190, 90, 0.22) 0%, transparent 70%);
+  pointer-events: none;
+  animation: lampBreathe 6s ease-in-out infinite;
+}
+
+@keyframes lampBreathe {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+.menu-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  animation: menuIn var(--md-dur-long) var(--md-ease-emphasized);
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Логотип: React + ION в кружке --- */
+.menu-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.8rem, 8.5vw, 6rem);
+  line-height: 1;
+  letter-spacing: 0.01em;
+  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.85);
+}
+
+.menu-logo-react {
+  color: var(--md-on-surface);
+}
+
+/* ION как частица: кружок + минус */
+.menu-logo-ion {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-primary);
+  padding: 0.18em 0.34em;
+  margin-left: 0.14em;
+  border: 0.045em solid var(--md-primary);
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  animation: ionFloat 4.5s ease-in-out infinite;
+  box-shadow: 0 0 30px rgba(242, 208, 104, 0.35), inset 0 0 20px rgba(242, 208, 104, 0.12);
+  transition: box-shadow var(--md-dur-medium) var(--md-ease-standard);
+}
+
+.menu-logo-ion:hover {
+  box-shadow: 0 0 50px rgba(242, 208, 104, 0.65), inset 0 0 28px rgba(242, 208, 104, 0.2);
+}
+
+@keyframes ionFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(-2deg); }
+}
+
+/* Черточка-минус заряда иона */
+.ion-minus {
+  position: absolute;
+  top: -0.08em;
+  right: -0.12em;
+  width: 0.3em;
+  height: 0.045em;
+  background: var(--md-primary);
+  border-radius: 2px;
+}
+
+/* ------------------------------------------------------------------
+   Минусы, разлетающиеся при клике на ION
+   Слой .ion-field на весь экран — частицы не обрезаются.
+   ------------------------------------------------------------------ */
+.ion-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.ion-minus-particle {
+  position: fixed;
+  left: var(--x);
+  top: var(--y);
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--md-primary);
+  box-shadow: 0 0 10px rgba(242, 208, 104, 0.9);
+  pointer-events: none;
+  animation: minusFly 1.1s cubic-bezier(0.15, 0.7, 0.3, 1) forwards;
+}
+
+@keyframes minusFly {
+  from {
+    transform: translate(-50%, -50%) translate(0, 0) rotate(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -50%) translate(var(--dx), var(--dy))
+      rotate(var(--rot)) scale(0.35);
+    opacity: 0;
+  }
+}
+
+.menu-subtitle {
+  font-family: var(--font-headline);
+  font-style: italic;
+  font-size: clamp(0.95rem, 2vw, 1.25rem);
+  color: var(--md-on-surface-variant);
+  margin: 0.6rem 0 0;
+  letter-spacing: 0.04em;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: min(320px, 78vw);
+  margin-top: 2rem;
+}
+
+/* --- Модалка "Об игре" --- */
+.menu-modal[hidden] {
+  display: none;
+}
+
+.menu-about {
+  width: min(520px, 88vw);
+  background: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-lg);
+  padding: 1.8rem;
+  box-shadow: var(--md-elevation-3);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.menu-about h3 {
+  font-family: var(--font-headline);
+  font-style: italic;
+  color: var(--md-primary);
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.menu-about p {
+  font-family: var(--font-body);
+  color: var(--md-on-surface-variant);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.menu-about button {
+  align-self: flex-end;
+}
+
+/* --- Подпись автора --- */
+.credit {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 1rem;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--md-on-surface-variant);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 3;
+}

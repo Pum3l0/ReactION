@@ -1,4 +1,6 @@
+import './styles/fonts.css';
 import './styles/base.css';
+import './styles/menu.css';
 import './styles/screens.css';
 
 import { Renderer } from './core/renderer.js';
@@ -10,11 +12,11 @@ import { Game } from './core/game.js';
 import { menuScreen } from './screens/menu.js';
 import { mapScreen } from './screens/map.js';
 import { levelScreen } from './screens/level.js';
+import { getLocation } from './data/locations.js';
 
 /* --------------------------------------------------------------------------
- * Точка входа ChemQuest.
- * Собирает рендерер, свет, менеджеры сцен/экранов и состояние игры,
- * затем показывает главное меню.
+ * ReactION — точка входа.
+ * Собирает рендерер, свет, менеджеры сцен/экранов и состояние игры.
  * ------------------------------------------------------------------------ */
 
 const canvas = document.querySelector('#scene');
@@ -36,14 +38,27 @@ screens.register('menu', menuScreen);
 screens.register('map', mapScreen);
 screens.register('level', levelScreen);
 
-// Фон меню
+// Сцена следует за активным экраном.
+// Меню и карта → амбиентный 3D-фон, уровень → диорама локации.
+// Это чинит баг: при выходе с уровня фон всегда возвращается к меню.
+events.on('screen:changed', (id) => {
+  if (id === 'level') {
+    const location =
+      getLocation(game.state.currentLocation) ?? getLocation('warehouse');
+    scenes.show(location.id, location);
+  } else {
+    scenes.show(id);
+  }
+});
+
+// Фон меню (первый показ)
 scenes.show('menu');
 screens.show('menu');
 
-// Небольшой прогрев света в меню: лампа слегка «дышит»
+// Лёгкое «дыхание» света в меню
 renderer.onUpdate((_dt, elapsed) => {
   lighting.key.intensity = 55 + Math.sin(elapsed * 1.4) * 5;
 });
 
-// Для отладки из консоли
-window.__chemquest = ctx;
+// Доступ из консоли для отладки
+window.__reactIon = ctx;

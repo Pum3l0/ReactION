@@ -1,0 +1,84 @@
+/* ==========================================================================
+   ChemQuest — подключение шрифтов
+   Файлы лежат в /public/fonts/ и доступны по абсолютным путям /fonts/*.
+
+   Роли:
+   - Unbounded         → заголовки (display)
+   - Playfair Display  → подзаголовки (headline), italic
+   - Piazzolla         → основной текст (body)
+   - Google Sans       → интерфейс, кнопки (ui)
+   - JetBrains Mono    → формулы и хим. элементы (mono)
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Chem Display';
+  src: url('/fonts/header.ttf') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chem Display';
+  src: url('/fonts/header.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chem Headline';
+  src: url('/fonts/underheaders.ttf') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chem Headline';
+  src: url('/fonts/underheaders-italic.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chem Body';
+  src: url('/fonts/main.ttf') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chem Body';
+  src: url('/fonts/main-italic.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chem UI';
+  src: url('/fonts/google-sans-regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chem UI';
+  src: url('/fonts/google-sans-medium.ttf') format('truetype');
+  font-weight: 500 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chem Mono';
+  src: url('/fonts/jetbrains-mono-regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chem Mono';
+  src: url('/fonts/jetbrains-mono-semibold.ttf') format('truetype');
+  font-weight: 600 700;
+  font-display: swap;
+}

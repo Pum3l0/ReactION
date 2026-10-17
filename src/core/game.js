@@ -2,7 +2,7 @@
  * Игровое состояние: текущая локация, прогресс, ответы игрока.
  * Сохраняется в localStorage, чтобы «Продолжить» работало.
  */
-const STORAGE_KEY = 'chemquest.save.v1';
+const STORAGE_KEY = 'reaction.save.v1';
 
 export class Game {
   constructor() {
@@ -26,6 +26,15 @@ export class Game {
 
   isSolved(taskId) {
     return this.state.solved.includes(taskId);
+  }
+
+  /**
+   * Сбросить прогресс локации: следующая задача соберётся заново —
+   * другие вещества и другие пропуски.
+   */
+  clearSolved(locationId) {
+    this.state.solved = this.state.solved.filter((id) => id !== locationId);
+    this.save();
   }
 
   reset() {
