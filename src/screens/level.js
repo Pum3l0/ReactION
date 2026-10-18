@@ -119,7 +119,7 @@ export function levelScreen(container, ctx) {
                   return `
                     <td class="cell-gap" data-row="${i}" data-param="${p}">
                       <button class="blob" type="button" aria-label="Пропуск">
-                        <img src="/textures/props/Coffee_mark.png" alt="">
+                        <img src="/textures/props/Coffee_mark.webp" alt="">
                       </button>
                       <input class="blob-input" data-row="${i}" data-param="${p}"
                         placeholder="${PARAM_HINTS[p].split(',')[0]}"
@@ -302,14 +302,14 @@ export function levelScreen(container, ctx) {
       if (kind === 'mendeleev') {
         windows.openWindow('mendeleev', {
           title: 'Таблица Менделеева',
-          content: `<img class="window-img" src="/textures/props/mendeleevtab.png" alt="Таблица Менделеева">`,
+          content: `<img class="window-img" src="/textures/props/mendeleevtab.webp" alt="Таблица Менделеева">`,
           x: window.innerWidth * 0.52,
           y: 70,
         });
       } else if (kind === 'solubility') {
         windows.openWindow('solubility', {
           title: 'Таблица растворимости',
-          content: `<img class="window-img" src="/textures/props/rastvortable.png" alt="Таблица растворимости">`,
+          content: `<img class="window-img" src="/textures/props/rastvortable.webp" alt="Таблица растворимости">`,
           x: window.innerWidth * 0.62,
           y: 150,
         });

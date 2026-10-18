@@ -82,7 +82,7 @@ export function orbitalScreen(container, ctx) {
       <!-- Таблица Менделеева -->
       <div class="orbital-periodic" data-periodic-modal hidden>
         <div class="orbital-periodic-scrim" data-periodic-close></div>
-        <img class="orbital-periodic-img" src="/textures/props/mendeleevtab.png" alt="Таблица Менделеева">
+        <img class="orbital-periodic-img" src="/textures/props/mendeleevtab.webp" alt="Таблица Менделеева">
         <button class="btn btn--primary orbital-periodic-close" data-periodic-close>Закрыть</button>
       </div>
 

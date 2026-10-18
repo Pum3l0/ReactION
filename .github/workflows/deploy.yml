@@ -1,0 +1,50 @@
+name: Deploy to VPS
+
+# Запускается на каждый push в main и вручную из вкладки Actions.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Проверка, что сборка не пустая — защита от случайного деплоя мусора
+      - name: Verify build output
+        run: |
+          test -f dist/index.html || (echo "dist/index.html не найден" && exit 1)
+          echo "Размер dist: $(du -sh dist | cut -f1)"
+
+      # Доверяем хосту — иначе ssh/rsync могут отказаться подключаться
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      # Копируем готовую сборку: --delete убирает старые ассеты с хешами
+      - name: Upload dist via rsync
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avz --delete
+          path: dist/
+          remote_path: ${{ secrets.DEPLOY_PATH }}
+          remote_host: ${{ secrets.DEPLOY_HOST }}
+          remote_user: ${{ secrets.DEPLOY_USER }}
+          remote_key: ${{ secrets.DEPLOY_SSH_KEY }}

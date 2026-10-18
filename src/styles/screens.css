@@ -438,7 +438,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: url('/textures/props/list_wide.png') center / 100% 100% no-repeat;
+  background: url('/textures/props/list_wide.webp') center / 100% 100% no-repeat;
   filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.6));
   pointer-events: none;
   z-index: -1;

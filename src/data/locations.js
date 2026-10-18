@@ -16,10 +16,10 @@ export const LOCATIONS = [
     scene: '/textures/warehouse_table.webp',
     preview: '/textures/warehouse_table.webp',
     // В превью показываем Петровича поверх фона
-    previewNpc: '/textures/props/petrovich_head.png',
+    previewNpc: '/textures/props/petrovich_head.webp',
     npc: {
       name: 'Петрович',
-      portrait: '/textures/props/petrovich_head.png',
+      portrait: '/textures/props/petrovich_head.webp',
       lines: [
         'О, здорово, смена принята. Слушай, тут такое дело…',
         'Я кофе на накладную пролил. Шесть ячеек — кляксы, хоть плачь.',
