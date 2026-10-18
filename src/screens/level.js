@@ -66,6 +66,7 @@ export function levelScreen(container, ctx) {
       </aside>
 
       <button class="btn btn--ghost level-back" data-action="back">← Карта</button>
+      <button class="btn btn--ghost level-other" data-action="other">⟳ Другое</button>
 
       <!-- Подсказка: предметы на столе -->
       <div class="scene-tip">
@@ -145,6 +146,7 @@ export function levelScreen(container, ctx) {
       btn.textContent = 'Ответ';
       btn.dataset.action = 'answer';
     }
+    container.querySelector('.report-next')?.remove();
   }
 
   renderTable();
@@ -248,9 +250,17 @@ export function levelScreen(container, ctx) {
       solvedThisVisit = true;
       ctx.game.markSolved(location.id);
       say('Ну ты даёшь! Всё восстановил, накладная как новенькая. Спасибо, выручил!');
-      const btn = container.querySelector('[data-action="answer"]');
+      const btn = container.querySelector('.report-answer');
       btn.textContent = 'На карту';
       btn.dataset.action = 'to-map';
+      // Рядом — кнопка новой задачи
+      if (!container.querySelector('.report-next')) {
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'btn btn--tonal report-next';
+        nextBtn.dataset.action = 'other';
+        nextBtn.textContent = 'Ещё задание';
+        btn.after(nextBtn);
+      }
     } else {
       say(`Так, тут ещё ${total - correct} ячеек не сходится. Красные — перепроверь.`);
     }
@@ -266,6 +276,10 @@ export function levelScreen(container, ctx) {
     }
     if (event.target.closest('[data-action="collapse-report"]')) {
       container.querySelector('[data-report]')?.classList.toggle('is-collapsed');
+      return;
+    }
+    if (event.target.closest('[data-action="other"]')) {
+      resetTask();
       return;
     }
     if (event.target.closest('[data-action="answer"]')) {

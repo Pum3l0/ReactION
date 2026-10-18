@@ -50,6 +50,8 @@ export class Renderer {
     this._camBase = this.camera.position.clone();
     this._pointer = { x: 0, y: 0 };
     this._pointerTarget = { x: 0, y: 0 };
+    // Когда включён false — камерой управляет активный экран (например, атом)
+    this._parallaxEnabled = true;
 
     this._clock = new THREE.Clock();
     this._updaters = new Set();
@@ -78,6 +80,15 @@ export class Renderer {
     return () => this._updaters.delete(fn);
   }
 
+  /**
+   * Включить/выключить автоматический параллакс камерой.
+   * Экранам вроде 3D-атома камера нужна целиком — там параллакс выключается.
+   */
+  setParallax(enabled) {
+    this._parallaxEnabled = enabled;
+    if (enabled) this._camBase.copy(this.camera.position);
+  }
+
   _onPointerMove(event) {
     // Нормализуем в диапазон [-1, 1]
     this._pointerTarget.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -96,13 +107,15 @@ export class Renderer {
     const dt = Math.min(this._clock.getDelta(), 0.05);
     const elapsed = this._clock.elapsedTime;
 
-    // Инерция параллакса
-    this._pointer.x += (this._pointerTarget.x - this._pointer.x) * PARALLAX_EASE;
-    this._pointer.y += (this._pointerTarget.y - this._pointer.y) * PARALLAX_EASE;
+    if (this._parallaxEnabled) {
+      // Инерция параллакса
+      this._pointer.x += (this._pointerTarget.x - this._pointer.x) * PARALLAX_EASE;
+      this._pointer.y += (this._pointerTarget.y - this._pointer.y) * PARALLAX_EASE;
 
-    this.camera.position.x = this._camBase.x + this._pointer.x * PARALLAX_STRENGTH;
-    this.camera.position.y = this._camBase.y - this._pointer.y * PARALLAX_STRENGTH * 0.6;
-    this.camera.lookAt(0, 1.4, 0);
+      this.camera.position.x = this._camBase.x + this._pointer.x * PARALLAX_STRENGTH;
+      this.camera.position.y = this._camBase.y - this._pointer.y * PARALLAX_STRENGTH * 0.6;
+      this.camera.lookAt(0, 1.4, 0);
+    }
 
     for (const fn of this._updaters) fn(dt, elapsed);
 

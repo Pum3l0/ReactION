@@ -1,10 +1,14 @@
 /* ==========================================================================
-   Карта локаций
+   Карта локаций — сетка карточек с превью
    ========================================================================== */
 
 #screen-map {
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1.4rem;
+  padding: 2rem;
+  overflow-y: auto;
   background: radial-gradient(
     ellipse at center,
     transparent 0%,
@@ -13,17 +17,12 @@
   );
 }
 
-.map-panel {
-  width: min(560px, 88vw);
-  max-height: 90vh;
+.map-header {
+  width: min(1100px, 94vw);
   display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
-  padding: 2rem;
-  background: var(--md-surface-container-low);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--md-shape-xl);
-  box-shadow: var(--md-elevation-3);
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .map-heading {
@@ -32,41 +31,181 @@
   font-weight: 600;
   font-size: 2rem;
   color: var(--md-primary);
-  margin: 0 0 0.4rem;
-}
-
-.map-list {
-  list-style: none;
   margin: 0;
+}
+
+.map-grid {
+  width: min(1100px, 94vw);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.1rem;
+}
+
+/* --- Карточка локации --- */
+.loc-card {
+  display: flex;
+  flex-direction: column;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-  overflow-y: auto;
-}
-
-.map-item {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.2rem;
+  overflow: hidden;
   text-align: left;
-  padding: 1rem 1.3rem;
+  background: var(--md-surface-container-low);
+  border: 1px solid var(--md-outline-variant);
   border-radius: var(--md-shape-lg);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition:
+    transform var(--md-dur-medium) var(--md-ease-emphasized),
+    border-color var(--md-dur-medium) var(--md-ease-standard),
+    box-shadow var(--md-dur-medium) var(--md-ease-standard);
 }
 
-.map-item-title {
+.loc-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--md-primary);
+  box-shadow: var(--md-elevation-3), 0 0 28px rgba(242, 208, 104, 0.18);
+}
+
+.loc-card.is-locked {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.loc-card.is-locked:hover {
+  transform: none;
+  border-color: var(--md-outline-variant);
+  box-shadow: none;
+}
+
+/* --- Превью --- */
+.loc-preview {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  background: var(--md-surface-container-lowest);
+}
+
+.loc-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.85;
+  transition: transform var(--md-dur-long) var(--md-ease-standard);
+}
+
+.loc-card:hover .loc-preview-img {
+  transform: scale(1.04);
+}
+
+.loc-preview-npc {
+  position: absolute;
+  left: 0.8rem;
+  bottom: -1.2rem;
+  width: 68px;
+  height: 68px;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: var(--md-shape-md);
+  border: 2px solid var(--md-primary);
+  box-shadow: var(--md-elevation-2);
+}
+
+.loc-preview--locked {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--md-on-surface-variant);
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.02) 0 10px,
+    transparent 10px 20px
+  );
+}
+
+/* --- Мини-атом в превью Орбитария --- */
+.loc-preview--atom {
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 50%, rgba(242, 208, 104, 0.12), transparent 65%);
+}
+
+.atom-core {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--md-primary);
+  box-shadow: 0 0 18px rgba(242, 208, 104, 0.9);
+  animation: corePulse 2.6s ease-in-out infinite;
+}
+
+@keyframes corePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.atom-ring {
+  position: absolute;
+  width: 110px;
+  height: 40px;
+  border: 1px solid rgba(242, 208, 104, 0.55);
+  border-radius: 50%;
+}
+
+.atom-ring--1 { transform: rotate(0deg); }
+.atom-ring--2 { transform: rotate(60deg); }
+.atom-ring--3 { transform: rotate(120deg); }
+
+.atom-e {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff0b8;
+  box-shadow: 0 0 8px rgba(255, 240, 184, 0.9);
+}
+
+/* три электрона вращаются по своим орбитам */
+.atom-e--1 { animation: orbit1 4s linear infinite; }
+.atom-e--2 { animation: orbit2 5.5s linear infinite; }
+.atom-e--3 { animation: orbit3 7s linear infinite; }
+
+@keyframes orbit1 {
+  from { transform: rotate(0deg) translateX(55px) scaleY(0.36); }
+  to { transform: rotate(360deg) translateX(55px) scaleY(0.36); }
+}
+@keyframes orbit2 {
+  from { transform: rotate(60deg) translateX(55px) scaleY(0.36); }
+  to { transform: rotate(420deg) translateX(55px) scaleY(0.36); }
+}
+@keyframes orbit3 {
+  from { transform: rotate(120deg) translateX(55px) scaleY(0.36); }
+  to { transform: rotate(480deg) translateX(55px) scaleY(0.36); }
+}
+
+/* --- Тело карточки --- */
+.loc-body {
+  padding: 0.9rem 1.1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.loc-title {
   font-family: var(--font-ui);
   font-size: 1.1rem;
   font-weight: 500;
   color: var(--md-on-surface);
+  margin: 0;
 }
 
-.map-item-sub {
+.loc-sub {
   font-family: var(--font-body);
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   color: var(--md-on-surface-variant);
+  margin: 0;
 }
 
 /* ==========================================================================
@@ -458,7 +597,14 @@
    ------------------------------------------------------------------ */
 .report-answer {
   position: absolute;
-  left: 9.5rem;
+  left: 18rem;
+  bottom: 1.2rem;
+  z-index: 20;
+}
+
+.report-next {
+  position: absolute;
+  left: 27rem;
   bottom: 1.2rem;
   z-index: 20;
 }
@@ -509,6 +655,13 @@
 .level-back {
   position: absolute;
   left: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 21;
+}
+
+.level-other {
+  position: absolute;
+  left: 9.5rem;
   bottom: 1.2rem;
   z-index: 21;
 }

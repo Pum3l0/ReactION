@@ -1,19 +1,22 @@
 /**
  * Локации — рабочие места химика.
  *
- * Каждая локация это смена: панорама рабочего места, диалог коллеги и
- * задача-накладная. Сейчас полностью реализован склад; остальные —
- * заготовки под ту же механику.
+ * Каждая локация — смена: свой экран, своя механика и кейс.
+ *  screen     — какой экран открывать ('level' | 'orbital')
+ *  preview    — превью-картинка для карточки на карте
+ *  preview3d  — если true, в карточке вместо картинки мини-3D-атом
  */
 export const LOCATIONS = [
   {
     id: 'warehouse',
     title: 'Склад реактивов',
-    subtitle: 'Первая смена. Петрович и кофе.',
+    subtitle: 'Накладная, кофе и порядок',
+    screen: 'level',
     // Панорама рабочего места (вид от первого лица)
     scene: '/textures/warehouse_table.webp',
-    // Миниатюра/предисловие для карты
     preview: '/textures/warehouse_table.webp',
+    // В превью показываем Петровича поверх фона
+    previewNpc: '/textures/props/petrovich_head.png',
     npc: {
       name: 'Петрович',
       portrait: '/textures/props/petrovich_head.png',
@@ -26,18 +29,22 @@ export const LOCATIONS = [
     unlocked: true,
   },
   {
-    id: 'lab',
-    title: 'Химическая лаборатория',
-    subtitle: 'Синтез и анализ. Скоро.',
+    id: 'orbital',
+    title: 'Орбитарий',
+    subtitle: 'Паспорт элемента. Строение атома.',
+    screen: 'orbital',
     scene: null,
     preview: null,
+    // Карточка рисует мини-3D-атом
+    preview3d: true,
     npc: null,
-    unlocked: false,
+    unlocked: true,
   },
   {
     id: 'archive',
     title: 'Архив соединений',
-    subtitle: 'Хранилище формул. Скоро.',
+    subtitle: 'Хранилище формул. Скоро',
+    screen: null,
     scene: null,
     preview: null,
     npc: null,

@@ -13,24 +13,14 @@
     linear-gradient(180deg, #12161d 0%, #1e2530 100%);
 }
 
-/* --- Анимированный фон: плавающие молекулы/формулы --- */
-#screen-menu::before {
-  content: '';
+/* --- Живой фон: молекулы углеводородов (canvas) --- */
+.molecule-bg {
   position: absolute;
-  inset: -20%;
-  background-image:
-    radial-gradient(circle, rgba(242, 208, 104, 0.16) 1.5px, transparent 1.5px),
-    radial-gradient(circle, rgba(242, 208, 104, 0.09) 1px, transparent 1px);
-  background-size: 140px 140px, 90px 90px;
-  background-position: 0 0, 40px 60px;
-  animation: driftField 60s linear infinite;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  opacity: 0.7;
-}
-
-@keyframes driftField {
-  from { transform: translate(0, 0); }
-  to { transform: translate(-140px, -140px); }
+  z-index: 0;
 }
 
 /* --- Свечение-лампа сверху --- */

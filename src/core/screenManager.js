@@ -38,6 +38,7 @@ export class ScreenManager {
     if (this.current) {
       const prev = this.screens.get(this.current);
       prev.el.classList.remove('is-active');
+      prev.instance?.onHide?.();
     }
 
     // Монтируем при первом показе

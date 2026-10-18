@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { buildWarehouseScene } from './warehouse.js';
 
 /**
- * SceneManager — держит "текущую" игровую сцену поверх общих света/фона.
+ * SceneManager — держит «текущий» 3D-фон поверх общих света/настроек.
  *
- * Свет и настройки рендерера живут в Renderer и Lighting и не пересоздаются.
- * SceneManager только подчищает и подставляет геометрию конкретной локации.
+ * Локации теперь рисуются как панорамные картинки внутри DOM-экранов,
+ * поэтому 3D-склад-плейсхолдер больше не нужен: он лишь мелькал за
+ * панорамой при переходе на уровень. Здесь остаётся только амбиентный
+ * фон для меню и карты (даёт лёгкий параллакс камерой).
  */
 export class SceneManager {
   constructor(renderer, lighting) {
@@ -15,21 +16,24 @@ export class SceneManager {
     this.currentId = null;
   }
 
-  /** Показать сцену-плейсхолдер для конкретного контекста. */
-  show(id, location = null) {
-    this._clear();
-
-    if (id === 'warehouse') {
-      this.current = buildWarehouseScene(this.renderer.scene, location?.palette);
-    } else {
-      // Меню и карта: лёгкая "подложка" — пара плоскостей для параллакса
+  /** Показать 3D-фон. Локации переключают только подсветку, не геометрию. */
+  show(id) {
+    // Контент фона не зависит от экрана — не пересоздаём его без нужды.
+    if (!this.current) {
       this.current = buildAmbientBackdrop(this.renderer.scene);
+      this.renderer.scene.add(this.current);
     }
-
+    this.current.visible = true;
     this.currentId = id;
   }
 
-  _clear() {
+  /** Спрятать фон, не уничтожая его (у экранов вроде Орбитария свой 3D). */
+  hide() {
+    if (this.current) this.current.visible = false;
+  }
+
+  /** Полностью убрать фон (если понадобится). */
+  clear() {
     if (!this.current) return;
     this.renderer.scene.remove(this.current);
     this.current.traverse?.((obj) => {
@@ -71,6 +75,5 @@ function buildAmbientBackdrop(scene) {
   floor.receiveShadow = true;
   group.add(floor);
 
-  scene.add(group);
   return group;
 }

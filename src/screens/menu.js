@@ -3,11 +3,15 @@
  *
  * Логотип: "React" + "ION" в кружке-частице. По клику на ION по всему
  * экрану разлетаются маленькие минусы (см. styles/menu.css).
+ * На фоне дрейфуют молекулы углеводородов (MoleculeField).
  */
+import { MoleculeField } from '../ui/moleculeField.js';
+
 export function menuScreen(container, ctx) {
   container.id = 'screen-menu';
 
   container.innerHTML = `
+    <canvas class="molecule-bg" data-molecule-bg></canvas>
     <div class="menu-inner">
       <h1 class="menu-logo" aria-label="ReactION">
         <span class="menu-logo-react">React</span><span class="menu-logo-ion" data-ion>ION<i class="ion-minus"></i></span>
@@ -44,6 +48,9 @@ export function menuScreen(container, ctx) {
 
   const modal = container.querySelector('[data-modal]');
   const ionField = container.querySelector('[data-ion-field]');
+
+  // Живой фон: молекулы углеводородов
+  const moleculeField = new MoleculeField(container.querySelector('[data-molecule-bg]'));
 
   const onClick = (event) => {
     const ion = event.target.closest('[data-ion]');
@@ -97,5 +104,10 @@ export function menuScreen(container, ctx) {
   }
 
   container.addEventListener('click', onClick);
-  return { dispose: () => container.removeEventListener('click', onClick) };
+  return {
+    dispose() {
+      container.removeEventListener('click', onClick);
+      moleculeField.destroy();
+    },
+  };
 }

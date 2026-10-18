@@ -2,6 +2,7 @@ import './styles/fonts.css';
 import './styles/base.css';
 import './styles/menu.css';
 import './styles/screens.css';
+import './styles/orbital.css';
 
 import { Renderer } from './core/renderer.js';
 import { createLighting } from './core/lighting.js';
@@ -12,7 +13,7 @@ import { Game } from './core/game.js';
 import { menuScreen } from './screens/menu.js';
 import { mapScreen } from './screens/map.js';
 import { levelScreen } from './screens/level.js';
-import { getLocation } from './data/locations.js';
+import { orbitalScreen } from './screens/orbital.js';
 
 /* --------------------------------------------------------------------------
  * ReactION — точка входа.
@@ -37,18 +38,17 @@ ctx.screens = screens;
 screens.register('menu', menuScreen);
 screens.register('map', mapScreen);
 screens.register('level', levelScreen);
+screens.register('orbital', orbitalScreen);
 
-// Сцена следует за активным экраном.
-// Меню и карта → амбиентный 3D-фон, уровень → диорама локации.
-// Это чинит баг: при выходе с уровня фон всегда возвращается к меню.
+// Сцена следует за активным экраном: меняется только 3D-фон меню/карты.
+// Сами локации рисуются панорамой внутри экрана уровня.
 events.on('screen:changed', (id) => {
-  if (id === 'level') {
-    const location =
-      getLocation(game.state.currentLocation) ?? getLocation('warehouse');
-    scenes.show(location.id, location);
-  } else {
-    scenes.show(id);
+  // Орбитарий владеет собственной 3D-сценой и камерой
+  if (id === 'orbital') {
+    scenes.hide();
+    return;
   }
+  scenes.show(id);
 });
 
 // Фон меню (первый показ)
