@@ -174,6 +174,12 @@ export class ReagentPanel {
     this.host.classList.toggle('is-collapsed', this.collapsed);
   }
 
+  /** Свернуть панель (используется при открытии пикера сосуда на телефоне). */
+  collapse() {
+    this.collapsed = true;
+    this.host.classList.add('is-collapsed');
+  }
+
   destroy() {
     this.host.removeEventListener('click', this._onClick);
     this.searchEl?.removeEventListener('input', this._onInput);

@@ -1,4 +1,4 @@
-import { REAGENTS, SOLUBILITY, INDICATORS } from '../../data/reactions.js';
+import { REAGENTS, SOLUBILITY, INDICATORS, THERMAL, THERMAL_PRIORITY } from '../../data/reactions.js';
 
 /**
  * Движок реакций — чистый расчёт. Здесь НЕТ Three.js.
@@ -55,6 +55,37 @@ export function computeMixture(reagentIds) {
     hasPrecipitate: reactions.some((r) => r.precipitate),
     hasGas: reactions.some((r) => r.gas),
   };
+}
+
+/**
+ * Реакции, которые идут ТОЛЬКО при нагреве (термическое разложение).
+ * @param {string[]} reagentIds — что сейчас в сосуде
+ * @returns {{reactions: object[], changed: boolean}}
+ */
+export function computeHeated(reagentIds) {
+  const ions = collectIons(reagentIds);
+  const found = [];
+
+  for (let i = 0; i < ions.length; i++) {
+    for (let j = i + 1; j < ions.length; j++) {
+      const rule = THERMAL[ions[i] + '|' + ions[j]] ?? THERMAL[ions[j] + '|' + ions[i]];
+      if (rule) found.push({ ...rule, thermal: true, pair: [ions[i], ions[j]] });
+    }
+  }
+
+  // Приоритет: разложение осадка важнее смены цвета. Берём самое наглядное.
+  found.sort((a, b) => priority(b) - priority(a));
+  const reactions = found.slice(0, 1);
+
+  return { reactions, changed: reactions.length > 0 };
+}
+
+/** Вес наглядности термической реакции. */
+function priority(r) {
+  if (r.decomposes) return 3;
+  if (r.gas) return 2;
+  if (r.color) return 1;
+  return 0;
 }
 
 /** Плоский список ионов из всех налитых реагентов. */
@@ -134,7 +165,10 @@ export function describeResult(result, reagentIds) {
   const formulas = reagentIds.map((id) => REAGENTS[id]?.formula ?? id);
 
   for (const r of result.reactions) {
-    if (r.precipitate && r.formula) {
+    if (r.thermal) {
+      // Реакция от нагрева — со значком огня
+      lines.push({ kind: 'heat', text: '🔥 ' + r.name, formula: r.toFormula });
+    } else if (r.precipitate && r.formula) {
       lines.push({
         kind: 'precipitate',
         text: r.name + ' — осадок',
@@ -190,6 +224,16 @@ export function checkShiftGoal(task, result) {
         ? { ok: true, reason: 'Реакция нейтрализации прошла.' }
         : { ok: false, reason: 'Нейтрализации не произошло.' };
     }
+    case 'heat': {
+      // Проверяется по результату нагрева (result.reactions c thermal),
+      // а не по обычной смеси.
+      const hit = (result.reactions ?? []).find(
+        (r) => r.thermal && r.toFormula === goal.product,
+      );
+      return hit
+        ? { ok: true, reason: 'Вещество разложилось при нагреве — верно.' }
+        : { ok: false, reason: 'При нагреве нужного превращения не произошло.' };
+    }
     case 'color': {
       const ok = result.solutionColor === goal.color;
       return ok
@@ -205,4 +249,4 @@ export function reagentLabel(id) {
   return REAGENTS[id]?.formula ?? id;
 }
 
-export { REAGENTS, SOLUBILITY, INDICATORS };
+export { REAGENTS, SOLUBILITY, INDICATORS, THERMAL };

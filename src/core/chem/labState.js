@@ -1,4 +1,4 @@
-import { computeMixture, checkShiftGoal } from './reactionEngine.js';
+import { computeMixture, computeHeated, checkShiftGoal } from './reactionEngine.js';
 import { REAGENTS } from '../../data/reactions.js';
 import {
   tintLiquid,
@@ -143,23 +143,69 @@ export class LabState {
     this.lab.magnet?.clear();
   }
 
-  /** Поставить сосуд на горелку: показываем пламя и/или пар. */
+  /**
+   * Поставить сосуд на горелку: зажигаем пламя, показываем пар И
+   * запускаем термические реакции (разложение осадков и пр.).
+   */
   startHeating(vesselId) {
     const vessel = this.lab.getVessel(vesselId);
     if (!vessel || vessel.isEmpty) return { ok: false, reason: 'В сосуде пусто' };
     this.heating.add(vesselId);
     this.lab.flame.setOn(true);
 
-    // Если есть жидкость — показываем пар
-    if (this.steamTickers.has(vesselId)) return { ok: true };
-    const { tick } = spawnSteam(vessel.group, (pts) => {
-      pts.geometry.dispose();
-      pts.material.dispose();
-      vessel.group.remove(pts);
-      this.steamTickers.delete(vesselId);
-    });
-    this.steamTickers.set(vesselId, tick);
-    return { ok: true, hot: true };
+    // Пар, если есть жидкость
+    if (!this.steamTickers.has(vesselId)) {
+      const { tick } = spawnSteam(vessel.group, (pts) => {
+        pts.geometry.dispose();
+        pts.material.dispose();
+        vessel.group.remove(pts);
+        this.steamTickers.delete(vesselId);
+      });
+      this.steamTickers.set(vesselId, tick);
+    }
+
+    // Химия нагрева: термическое разложение
+    const thermal = this._applyHeat(vessel);
+
+    return { ok: true, hot: true, reactions: thermal };
+  }
+
+  /**
+   * Рассчитать и показать термические реакции в сосуде.
+   * Возвращает список дескрипторов (для надписи сверху).
+   */
+  _applyHeat(vessel) {
+    const heated = computeHeated(vessel.reagentIds);
+    if (!heated.changed) return [];
+
+    // Находим первую реакцию с видимым эффектом и применяем
+    const main = heated.reactions.find((r) => r.color || r.decomposes || r.gas) ?? heated.reactions[0];
+
+    if (main.decomposes) {
+      // Осадок превратился (разложение): убираем облако, перекрашиваем
+      clearPrecipitate(vessel.group);
+      // Перекрашиваем и жидкость, и твёрдое
+      if (main.color) {
+        tintLiquid(vessel.liquid, main.color, 1.2);
+        if (vessel.solid) vessel.solid.material.color.setHex(main.color);
+      }
+      // Если есть твёрдые — перекрашиваем горку
+      if (vessel.solid && vessel.contents.some((c) => c.phase === 'solid')) {
+        updateSolidGeometry(vessel.solid, vessel.solidLevel, 'powder');
+      }
+    } else if (main.color) {
+      // Просто меняется цвет (например, кристаллогидрат теряет воду)
+      tintLiquid(vessel.liquid, main.color, 1.2);
+      if (vessel.solid) vessel.solid.material.color.setHex(main.color);
+    }
+
+    if (main.gas) {
+      this._startGas(vessel, main.product === 'CO2' ? 0xffffff : 0xf5f0e0);
+    }
+
+    this.lastHeated = heated;
+    this.lastVesselId = vessel.id;
+    return heated.reactions;
   }
 
   stopHeating(vesselId) {
@@ -279,6 +325,13 @@ export class LabState {
   /** Проверить задание (если оно есть). */
   checkGoal() {
     if (!this.task) return { ok: null, reason: 'Режим-полигон: заданий нет.' };
+    // Задания на нагрев проверяются по результату термической реакции
+    if (this.task.goal?.kind === 'heat') {
+      if (!this.lastHeated) {
+        return { ok: false, reason: 'Вещество ещё не нагревали.' };
+      }
+      return checkShiftGoal(this.task, this.lastHeated);
+    }
     if (!this.lastResult) return { ok: false, reason: 'Пока ничего не произошло.' };
     return checkShiftGoal(this.task, this.lastResult);
   }

@@ -9,6 +9,7 @@ import { createModeSwitch } from '../ui/modeSwitch.js';
 import { WindowManager } from '../core/windowManager.js';
 import { ReagentPanel } from '../ui/reagentPanel.js';
 import { createOnboarding, isOnboarded } from '../ui/onboarding.js';
+import { isPhone } from '../core/device.js';
 
 /**
  * Экран «Лаборатория» — рабочий стол химика в 3D.
@@ -104,6 +105,13 @@ export function labScreen(container, ctx) {
     '<div class="lab-tip">' +
       '<strong>Как работать:</strong> открой «Реактивы» слева, выбери вещество, ' +
       'затем кликни посуду — нальётся. Кнопки на посуде: 🔥 нагрев, ⧗ фильтр, 🧲 магнит.' +
+    '</div>' +
+
+    // Мобильный быстрый выбор сосуда (появляется при выборе реактива)
+    '<div class="lab-pour-picker" data-pour-picker hidden>' +
+      '<div class="lab-pour-title" data-pour-title></div>' +
+      '<div class="lab-pour-grid" data-pour-grid></div>' +
+      '<button class="lab-pour-cancel" data-pour-cancel>Отмена</button>' +
     '</div>';
 
   const modeSwitch = createModeSwitch({
@@ -129,7 +137,34 @@ export function labScreen(container, ctx) {
     journalList: container.querySelector('[data-journal-list]'),
     next: container.querySelector('[data-action="next"]'),
     check: container.querySelector('[data-action="check"]'),
+    pourPicker: container.querySelector('[data-pour-picker]'),
+    pourTitle: container.querySelector('[data-pour-title]'),
+    pourGrid: container.querySelector('[data-pour-grid]'),
   };
+
+  // На телефоне играем через крупные кнопки вместо точного 3D-клика
+  const mobile = isPhone() || window.matchMedia('(max-width: 760px)').matches;
+  if (mobile) container.classList.add('is-mobile');
+
+  /** Крупный выбор сосуда, куда налить (мобильный режим). */
+  function openPourPicker(reagentId) {
+    const r = REAGENTS[reagentId];
+    els.pourTitle.innerHTML =
+      'Куда налить <b>' + (r?.formula ?? reagentId) + '</b>?';
+    els.pourGrid.innerHTML = ['tube-a', 'tube-b', 'beaker', 'flask']
+      .map((id) =>
+        '<button class="lab-pour-vessel" data-pour="' + id + '">' +
+          '<span class="lab-pour-vessel-name">' + VESSEL_LABELS[id] + '</span>' +
+        '</button>')
+      .join('');
+    els.pourPicker.hidden = false;
+    // Сворачиваем панель реактивов, чтобы не перекрывала пикер
+    panel?.collapse?.();
+  }
+
+  function closePourPicker() {
+    els.pourPicker.hidden = true;
+  }
 
   /** Показать журнал выполненных опытов. */
   function renderJournal() {
@@ -277,6 +312,8 @@ export function labScreen(container, ctx) {
         '<span class="lab-hand-vial" style="--vial-color:' + vialColorVar(r?.color) + '"></span>' +
         '<span class="lab-hand-text">В руке: <b>' + (r?.formula ?? id) + '</b> — кликни посуду</span>';
       setStatus('Взял ' + (r?.formula ?? id) + '. Кликни по посуде, чтобы налить.');
+      // На телефоне сразу предлагаем крупный выбор сосуда
+      if (mobile) openPourPicker(picked);
     } else {
       els.hand.hidden = true;
     }
@@ -299,7 +336,7 @@ export function labScreen(container, ctx) {
     // повторный клик по той же карточке.
   }
 
-  /** Нагрев: сосуд перелетает на горелку и обратно. */
+  /** Нагрев: сосуд перелетает на горелку, идёт реакция разложения. */
   function heatVessel(vesselId) {
     if (!state) return;
     const v = lab.getVessel(vesselId);
@@ -308,13 +345,29 @@ export function labScreen(container, ctx) {
       state.stopHeating(vesselId);
       v.onBurner = false;
       gsap.to(v.group.position, { x: v.homePos.x, y: v.homePos.y, z: v.homePos.z, duration: 0.8, ease: 'power2.inOut' });
-      setStatus(VESSEL_LABELS[vesselId] + ' снята с горелки.');
+      setStatus(VESSEL_LABELS[vesselId] + ' снят с горелки.');
     } else {
       const r = state.startHeating(vesselId);
       if (!r.ok) { setStatus(r.reason, 'fail'); return; }
       v.onBurner = true;
-      gsap.to(v.group.position, { x: lab.heatSpot.x + 0.55, y: 1.55, z: lab.heatSpot.z + 0.4, duration: 0.8, ease: 'power2.inOut' });
-      setStatus(VESSEL_LABELS[vesselId] + ' на горелке. Нагревается…');
+      // Ставим РОВНО над пламенем горелки
+      gsap.to(v.group.position, {
+        x: lab.heatSpot.x, y: 0.92, z: lab.heatSpot.z,
+        duration: 0.8, ease: 'power2.inOut',
+      });
+
+      if (r.reactions && r.reactions.length) {
+        // Есть реакция разложения — показываем её
+        const lines = r.reactions.map((x) => ({
+          kind: 'heat',
+          text: '🔥 ' + x.name,
+          formula: x.toFormula,
+        }));
+        showReadout(lines);
+        setStatus(VESSEL_LABELS[vesselId] + ' на горелке: ' + r.reactions[0].name + '.');
+      } else {
+        setStatus(VESSEL_LABELS[vesselId] + ' на горелке. Нагревается…');
+      }
     }
   }
 
@@ -432,7 +485,7 @@ export function labScreen(container, ctx) {
   function onPointerDown(event) {
     if (!state) return;
     // Клик по интерфейсу — не наша забота
-    if (event.target.closest('.lab-topbar, .lab-task, .lab-vessels, .lab-tip, .window')) return;
+    if (event.target.closest('.lab-topbar, .lab-task, .lab-vessels, .lab-tip, .window, .lab-pour-picker')) return;
 
     // Начало drag реактива из панели
     const item = event.target.closest('.lab-item[data-id]');
@@ -677,6 +730,18 @@ export function labScreen(container, ctx) {
 
   const onClick = (event) => {
     if (event.target.closest('[data-action="back"]')) { ctx.screens.show('map'); return; }
+    // Мобильный пикер сосуда
+    const pourBtn = event.target.closest('[data-pour]');
+    if (pourBtn) {
+      closePourPicker();
+      pourToVessel(pourBtn.dataset.pour);
+      return;
+    }
+    if (event.target.closest('[data-pour-cancel]')) {
+      closePourPicker();
+      pickReagent(picked); // снять «руку»
+      return;
+    }
     if (event.target.closest('[data-action="tables"]')) { openTables(); return; }
     if (event.target.closest('[data-action="journal"]')) { renderJournal(); return; }
     if (event.target.closest('[data-action="journal-close"]')) { els.journal.hidden = true; return; }
@@ -734,6 +799,7 @@ export function labScreen(container, ctx) {
       setupScene();
       renderTask();
       buildPanel();
+      closePourPicker();
       startOnboarding();
     },
     onHide() {
