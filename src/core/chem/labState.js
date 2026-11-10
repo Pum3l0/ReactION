@@ -178,29 +178,33 @@ export class LabState {
     const heated = computeHeated(vessel.reagentIds);
     if (!heated.changed) return [];
 
-    // Находим первую реакцию с видимым эффектом и применяем
-    const main = heated.reactions.find((r) => r.color || r.decomposes || r.gas) ?? heated.reactions[0];
+    // Применяем ВСЕ найденные реакции (их обычно 1–2).
+    // Берём самую наглядную для цвета/осадка, газ пускаем отдельно.
+    const main = heated.reactions.find((r) => r.color || r.decomposes)
+      ?? heated.reactions.find((r) => r.gas)
+      ?? heated.reactions[0];
 
     if (main.decomposes) {
-      // Осадок превратился (разложение): убираем облако, перекрашиваем
+      // Осадок/твёрдое превратилось: убираем облако осадка, перекрашиваем
       clearPrecipitate(vessel.group);
-      // Перекрашиваем и жидкость, и твёрдое
       if (main.color) {
         tintLiquid(vessel.liquid, main.color, 1.2);
         if (vessel.solid) vessel.solid.material.color.setHex(main.color);
       }
-      // Если есть твёрдые — перекрашиваем горку
       if (vessel.solid && vessel.contents.some((c) => c.phase === 'solid')) {
         updateSolidGeometry(vessel.solid, vessel.solidLevel, 'powder');
       }
     } else if (main.color) {
-      // Просто меняется цвет (например, кристаллогидрат теряет воду)
       tintLiquid(vessel.liquid, main.color, 1.2);
       if (vessel.solid) vessel.solid.material.color.setHex(main.color);
     }
 
-    if (main.gas) {
-      this._startGas(vessel, main.product === 'CO2' ? 0xffffff : 0xf5f0e0);
+    // Пузырьки газа: у CO2 — белые, у NH3 — почти невидимые/ слегка жёлтые,
+    // у водяного пара — уже есть отдельный эффект пара.
+    const gasRule = heated.reactions.find((r) => r.gas && r.gas !== 'H2O');
+    if (gasRule) {
+      const color = gasRule.gas === 'NH3' ? 0xeaf2ff : 0xffffff;
+      this._startGas(vessel, color, true); // force: перезапускаем поток газа
     }
 
     this.lastHeated = heated;
@@ -252,8 +256,10 @@ export class LabState {
     this._logReaction(vessel, result);
   }
 
-  _startGas(vessel, color) {
-    if (this.gasSprites.has(vessel.id)) return;
+  _startGas(vessel, color, force = false) {
+    // Обычно один поток газа на сосуд, но принудительно (нагрев)
+    // перезапускаем — иначе видимого изменения не будет.
+    if (this.gasSprites.has(vessel.id) && !force) return;
     const { mesh, tick } = spawnGas(vessel.group, color, vessel, (m) => {
       m.geometry.dispose();
       m.material.dispose();

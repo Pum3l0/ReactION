@@ -213,29 +213,50 @@ export const SOLUBILITY = {
 /* --------------------------------------------------------------------------
  * РЕАКЦИИ ПРИ НАГРЕВЕ (термическое разложение и пр.).
  *
- * Ключ — пара ионов, как в SOLUBILITY, но правило срабатывает ТОЛЬКО
- * когда сосуд стоит на горелке. Типично: голубой осадок Cu(OH)2 при
- * нагреве чернеет (CuO), бурый Fe(OH)3 темнеет, карбонат кальция при
- * прокаливании выделяет CO2, кристаллогидрат сульфата меди теряет воду.
+ * Нагрев в игре = знак «t°» над стрелкой в уравнении. Правило срабатывает
+ * ТОЛЬКО когда сосуд стоит на горелке.
  *
- * Поля:
- *   toFormula — что образуется (для журнала)
- *   color     — новый цвет вещества/раствора (0xRRGGBB)
- *   gas       — выделяется газ (пузырьки)
- *   decomposes: true — осадок исчезает (превратился)
- *   name      — описание для отчёта
+ * Есть ДВА набора правил:
+ *   1. THERMAL        — по ПАРЕ ионов (когда в сосуде смесь, напр. Cu+OH)
+ *   2. THERMAL_REAGENT — по id ОДНОГО реагента (напр. аммиак, H2O2)
+ *
+ * Поля правила:
+ *   toFormula  — что образуется (для журнала и надписи)
+ *   color      — новый цвет вещества/раствора (0xRRGGBB)
+ *   gas        — true или формула выделяющегося газа ('NH3', 'CO2'...)
+ *   decomposes — твёрдое/осадок превращается (меняет цвет/исчезает)
+ *   equation   — готовое уравнение с «t°» для надписи
+ *   name       — описание для отчёта
  * ------------------------------------------------------------------------ */
 export const THERMAL = {
-  // Cu(OH)2 -> CuO + H2O: синий осадок чернеет
-  'OH|Cu':  { decomposes: true, color: 0x1c1c1c, toFormula: 'CuO', name: 'гидроксид меди разлагается: чёрный оксид меди (II)' },
-  // Fe(OH)3 -> Fe2O3 + H2O: бурый темнеет до красно-бурого
-  'OH|Fe3': { decomposes: true, color: 0x6b2a10, toFormula: 'Fe2O3', name: 'гидроксид железа (III) разлагается: оксид железа (III)' },
-  // Mg(OH)2 -> MgO + H2O
-  'OH|Mg':  { decomposes: true, color: 0xf2f2ee, toFormula: 'MgO', name: 'гидроксид магния разлагается до оксида магния' },
-  // Ca(OH)2 -> CaO + H2O
-  'OH|Ca':  { decomposes: true, color: 0xf0efe8, toFormula: 'CaO', name: 'гидроксид кальция разлагается до оксида' },
-  // CaCO3 -> CaO + CO2 (обжиг известняка): идёт газ
-  'CO3|Ca': { decomposes: true, gas: true, product: 'CO2', color: 0xf0efe8, toFormula: 'CaO', name: 'карбонат кальция разлагается: выделяется CO2' },
+  // --- Гидроксиды -> оксиды + вода ---
+  'OH|Cu':  { decomposes: true, color: 0x1c1c1c, toFormula: 'CuO', gas: 'H2O', name: 'гидроксид меди (II) разлагается', equation: 'Cu(OH)2 --t--> CuO + H2O' },
+  'OH|Fe3': { decomposes: true, color: 0x6b2a10, toFormula: 'Fe2O3', gas: 'H2O', name: 'гидроксид железа (III) разлагается', equation: '2Fe(OH)3 --t--> Fe2O3 + 3H2O' },
+  'OH|Fe2': { decomposes: true, color: 0x3a3a3a, toFormula: 'FeO', gas: 'H2O', name: 'гидроксид железа (II) разлагается', equation: 'Fe(OH)2 --t--> FeO + H2O' },
+  'OH|Mg':  { decomposes: true, color: 0xf2f2ee, toFormula: 'MgO', gas: 'H2O', name: 'гидроксид магния разлагается', equation: 'Mg(OH)2 --t--> MgO + H2O' },
+  'OH|Ca':  { decomposes: true, color: 0xf0efe8, toFormula: 'CaO', gas: 'H2O', name: 'гидроксид кальция разлагается', equation: 'Ca(OH)2 --t--> CaO + H2O' },
+  'OH|Al':  { decomposes: true, color: 0xf0f0ea, toFormula: 'Al2O3', gas: 'H2O', name: 'гидроксид алюминия разлагается', equation: '2Al(OH)3 --t--> Al2O3 + 3H2O' },
+  'OH|Zn':  { decomposes: true, color: 0xf2f2ee, toFormula: 'ZnO', gas: 'H2O', name: 'гидроксид цинка разлагается', equation: 'Zn(OH)2 --t--> ZnO + H2O' },
+  'OH|Ni':  { decomposes: true, color: 0x4a6a4a, toFormula: 'NiO', gas: 'H2O', name: 'гидроксид никеля (II) разлагается', equation: 'Ni(OH)2 --t--> NiO + H2O' },
+
+  // --- Карбонаты -> оксиды + CO2 ---
+  'CO3|Ca':  { decomposes: true, gas: 'CO2', color: 0xf0efe8, toFormula: 'CaO', name: 'карбонат кальция разлагается', equation: 'CaCO3 --t--> CaO + CO2 (газ)' },
+  'CO3|Cu':  { decomposes: true, gas: 'CO2', color: 0x1c1c1c, toFormula: 'CuO', name: 'карбонат меди (II) разлагается', equation: 'CuCO3 --t--> CuO + CO2 (газ)' },
+  'CO3|Mg':  { decomposes: true, gas: 'CO2', color: 0xf2f2ee, toFormula: 'MgO', name: 'карбонат магния разлагается', equation: 'MgCO3 --t--> MgO + CO2 (газ)' },
+  'CO3|Zn':  { decomposes: true, gas: 'CO2', color: 0xf2f2ee, toFormula: 'ZnO', name: 'карбонат цинка разлагается', equation: 'ZnCO3 --t--> ZnO + CO2 (газ)' },
+  'CO3|Ba':  { decomposes: true, gas: 'CO2', color: 0xf2f2ee, toFormula: 'BaO', name: 'карбонат бария разлагается', equation: 'BaCO3 --t--> BaO + CO2 (газ)' },
+};
+
+/**
+ * Термические реакции по id ОДНОГО реагента (когда пара ионов не нужна).
+ * Например, аммиачная вода при нагреве выделяет газ NH3.
+ */
+export const THERMAL_REAGENT = {
+  nh3:    { color: null, gas: 'NH3', toFormula: 'NH3', name: 'аммиак выделяется при нагреве', equation: 'NH4OH --t--> NH3 (газ) + H2O' },
+  caoh2:  { color: 0xf0efe8, gas: 'H2O', toFormula: 'CaO', name: 'гидроксид кальция разлагается', equation: 'Ca(OH)2 --t--> CaO + H2O' },
+  caco3:  { decomposes: true, gas: 'CO2', color: 0xf0efe8, toFormula: 'CaO', name: 'карбонат кальция разлагается', equation: 'CaCO3 --t--> CaO + CO2 (газ)' },
+  kmno4:  { decomposes: true, gas: 'O2', color: 0x2a2a2a, toFormula: 'K2MnO4 + MnO2', name: 'перманганат калия разлагается', equation: '2KMnO4 --t--> K2MnO4 + MnO2 + O2 (газ)' },
+  cuo:    { color: 0x6b2a10, toFormula: 'Cu2O', name: 'оксид меди (II) частично восстанавливается', equation: '4CuO --t--> 2Cu2O + O2' },
 };
 
 /**

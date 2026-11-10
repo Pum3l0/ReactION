@@ -1,4 +1,7 @@
-import { REAGENTS, SOLUBILITY, INDICATORS, THERMAL, THERMAL_PRIORITY } from '../../data/reactions.js';
+import {
+  REAGENTS, SOLUBILITY, INDICATORS,
+  THERMAL, THERMAL_REAGENT, THERMAL_PRIORITY,
+} from '../../data/reactions.js';
 
 /**
  * Движок реакций — чистый расчёт. Здесь НЕТ Three.js.
@@ -66,11 +69,18 @@ export function computeHeated(reagentIds) {
   const ions = collectIons(reagentIds);
   const found = [];
 
+  // 1. По парам ионов (смеси: Cu+OH, Ca+CO3 и т.п.)
   for (let i = 0; i < ions.length; i++) {
     for (let j = i + 1; j < ions.length; j++) {
       const rule = THERMAL[ions[i] + '|' + ions[j]] ?? THERMAL[ions[j] + '|' + ions[i]];
       if (rule) found.push({ ...rule, thermal: true, pair: [ions[i], ions[j]] });
     }
+  }
+
+  // 2. По отдельным реагентам (аммиак, гашёная известь и т.п.)
+  for (const id of reagentIds) {
+    const rule = THERMAL_REAGENT[id];
+    if (rule) found.push({ ...rule, thermal: true, reagentId: id });
   }
 
   // Приоритет: разложение осадка важнее смены цвета. Берём самое наглядное.
@@ -166,8 +176,19 @@ export function describeResult(result, reagentIds) {
 
   for (const r of result.reactions) {
     if (r.thermal) {
-      // Реакция от нагрева — со значком огня
-      lines.push({ kind: 'heat', text: '🔥 ' + r.name, formula: r.toFormula });
+      // Реакция от нагрева: показываем уравнение и что выделилось
+      const parts = ['🔥 ' + r.name];
+      if (r.gas && r.gas !== 'H2O') {
+        const g = r.gas === 'NH3' ? 'аммиак NH3' : r.gas === 'CO2' ? 'углекислый газ CO2' : r.gas;
+        parts.push('↑ выделяется газ: ' + g);
+      } else if (r.gas === 'H2O') {
+        parts.push('выделяется водяной пар');
+      }
+      lines.push({
+        kind: 'heat',
+        text: parts.join(' · '),
+        formula: r.equation ?? r.toFormula,
+      });
     } else if (r.precipitate && r.formula) {
       lines.push({
         kind: 'precipitate',

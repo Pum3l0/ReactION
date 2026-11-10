@@ -268,7 +268,7 @@ export function createSolidMesh(kind, color) {
  * Частицы насыпаются на дно и лежат в конусе, а не по всему объёму.
  */
 export function updateSolidGeometry(solid, level, variant = 'powder') {
-  if (!solid) return;
+  if (!solid || !solid.userData) return;
   const shape = solid.userData.shape;
   if (!shape) return;
   const clamped = Math.max(0, Math.min(level, 1));

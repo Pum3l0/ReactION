@@ -357,12 +357,18 @@ export function labScreen(container, ctx) {
       });
 
       if (r.reactions && r.reactions.length) {
-        // Есть реакция разложения — показываем её
-        const lines = r.reactions.map((x) => ({
-          kind: 'heat',
-          text: '🔥 ' + x.name,
-          formula: x.toFormula,
-        }));
+        // Показываем все термические реакции: что произошло и что выделилось
+        const lines = r.reactions.map((x) => {
+          const parts = ['🔥 ' + x.name];
+          if (x.gas && x.gas !== 'H2O') {
+            const g = x.gas === 'NH3' ? 'аммиак NH3'
+              : x.gas === 'CO2' ? 'углекислый газ CO2' : x.gas;
+            parts.push('↑ ' + g);
+          } else if (x.gas === 'H2O') {
+            parts.push('водяной пар');
+          }
+          return { kind: 'heat', text: parts.join(' · '), formula: x.equation ?? x.toFormula };
+        });
         showReadout(lines);
         setStatus(VESSEL_LABELS[vesselId] + ' на горелке: ' + r.reactions[0].name + '.');
       } else {
