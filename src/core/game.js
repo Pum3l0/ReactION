@@ -2,19 +2,36 @@
  * Игровое состояние: текущая локация, прогресс, ответы игрока.
  * Сохраняется в localStorage, чтобы «Продолжить» работало.
  */
-const STORAGE_KEY = 'reaction.save.v1';
+const STORAGE_KEY = 'reaction.save.v2';
 
 export class Game {
   constructor() {
     this.state = this._load() ?? {
       currentLocation: null,
       solved: [],
+      mode: 'shift',       // 'shift' | 'lab' — активный раздел
+      shiftSolved: [],      // id выполненных заданий смены
+      labSolved: [],        // id выполненных лабораторных опытов
     };
+    // Мягкая миграция со старого сейва
+    this.state.mode ??= 'shift';
+    this.state.shiftSolved ??= [];
+    this.state.labSolved ??= [];
   }
 
   setLocation(id) {
     this.state.currentLocation = id;
     this.save();
+  }
+
+  /** Активный раздел: смена (история) или лаборатория (учёба). */
+  setMode(mode) {
+    this.state.mode = mode;
+    this.save();
+  }
+
+  get mode() {
+    return this.state.mode;
   }
 
   markSolved(taskId) {
@@ -28,17 +45,45 @@ export class Game {
     return this.state.solved.includes(taskId);
   }
 
-  /**
-   * Сбросить прогресс локации: следующая задача соберётся заново —
-   * другие вещества и другие пропуски.
-   */
+  // --- Прогресс смены ---
+
+  markShiftTaskSolved(id) {
+    if (!this.state.shiftSolved.includes(id)) {
+      this.state.shiftSolved.push(id);
+      this.save();
+    }
+  }
+
+  solvedShiftTasks() {
+    return [...this.state.shiftSolved];
+  }
+
+  // --- Прогресс лаборатории ---
+
+  markLabTaskSolved(id) {
+    if (!this.state.labSolved.includes(id)) {
+      this.state.labSolved.push(id);
+      this.save();
+    }
+  }
+
+  solvedLabTasks() {
+    return [...this.state.labSolved];
+  }
+
   clearSolved(locationId) {
     this.state.solved = this.state.solved.filter((id) => id !== locationId);
     this.save();
   }
 
   reset() {
-    this.state = { currentLocation: null, solved: [] };
+    this.state = {
+      currentLocation: null,
+      solved: [],
+      mode: 'shift',
+      shiftSolved: [],
+      labSolved: [],
+    };
     this.save();
   }
 

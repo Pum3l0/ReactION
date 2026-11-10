@@ -4,11 +4,39 @@
  * Логотип: "React" + "ION" в кружке-частице. По клику на ION по всему
  * экрану разлетаются маленькие минусы (см. styles/menu.css).
  * На фоне дрейфуют молекулы углеводородов (MoleculeField).
+ *
+ * Здесь же — переключатель режимов «Смена / Лаборатория»: он определяет,
+ * какой раздел откроется по кнопке «Начать».
  */
 import { MoleculeField } from '../ui/moleculeField.js';
+import { createModeSwitch } from '../ui/modeSwitch.js';
+
+const MODE_TEXT = {
+  shift: {
+    subtitle: 'Химия на смене',
+    cta: 'Начать смену',
+    about:
+      'ReactION — игра, где ты работаешь химиком на производстве. ' +
+      'Вместо скучных тестов — настоящие рабочие ситуации: восстанови ' +
+      'накладную, которую залил кофе, определи вещества по формуле и ' +
+      'свойствам. Применяй школьную химию там, где она реально нужна.',
+  },
+  lab: {
+    subtitle: 'Виртуальная лаборатория для школ',
+    cta: 'В лабораторию',
+    about:
+      'ReactION — виртуальная 3D-лаборатория для школ, у которых нет ' +
+      'денег на настоящие реактивы. Проводи опыты по программе: наливай ' +
+      'реагенты, наблюдай осадки, газ и смену цвета — всё как на реальной ' +
+      'лабораторной, но без опасности и затрат.',
+  },
+};
 
 export function menuScreen(container, ctx) {
   container.id = 'screen-menu';
+
+  let mode = ctx.game.mode ?? 'shift';
+  const text = MODE_TEXT[mode];
 
   container.innerHTML = `
     <canvas class="molecule-bg" data-molecule-bg></canvas>
@@ -16,11 +44,12 @@ export function menuScreen(container, ctx) {
       <h1 class="menu-logo" aria-label="ReactION">
         <span class="menu-logo-react">React</span><span class="menu-logo-ion" data-ion>ION<i class="ion-minus"></i></span>
       </h1>
-      <p class="menu-subtitle">Химия на смене</p>
+      <p class="menu-subtitle" data-subtitle>${text.subtitle}</p>
+
+      <div class="menu-mode" data-mode-slot></div>
 
       <div class="menu-buttons">
-        <button class="btn btn--primary" data-action="start">Начать смену</button>
-        <button class="btn btn--tonal" data-action="map">Карта локаций</button>
+        <button class="btn btn--primary" data-action="start">${text.cta}</button>
         <button class="btn btn--ghost" data-action="about">Об игре</button>
       </div>
     </div>
@@ -34,13 +63,8 @@ export function menuScreen(container, ctx) {
     <div class="menu-modal" data-modal hidden>
       <div class="modal-scrim" data-modal-close></div>
       <div class="modal-window menu-about">
-        <h3>Об игре</h3>
-        <p>
-          ReactION — игра, где ты работаешь химиком на производстве.
-          Вместо скучных тестов — настоящие рабочие ситуации: восстанови
-          накладную, которую залил кофе, определи вещества по формуле и
-          свойствам. Применяй школьную химию там, где она реально нужна.
-        </p>
+        <h3 data-about-title>Об игре</h3>
+        <p data-about-text>${text.about}</p>
         <button class="btn btn--primary" data-modal-close>Понятно</button>
       </div>
     </div>
@@ -48,6 +72,26 @@ export function menuScreen(container, ctx) {
 
   const modal = container.querySelector('[data-modal]');
   const ionField = container.querySelector('[data-ion-field]');
+  const subtitleEl = container.querySelector('[data-subtitle]');
+  const aboutTextEl = container.querySelector('[data-about-text]');
+  const startBtn = container.querySelector('[data-action="start"]');
+
+  const modeSwitch = createModeSwitch({
+    mode,
+    onMode: (id) => {
+      mode = id;
+      ctx.game.setMode(id);
+      applyModeText();
+    },
+  });
+  container.querySelector('[data-mode-slot]').replaceWith(modeSwitch);
+
+  function applyModeText() {
+    const t = MODE_TEXT[mode];
+    if (subtitleEl) subtitleEl.textContent = t.subtitle;
+    if (aboutTextEl) aboutTextEl.textContent = t.about;
+    if (startBtn) startBtn.textContent = t.cta;
+  }
 
   // Живой фон: молекулы углеводородов
   const moleculeField = new MoleculeField(container.querySelector('[data-molecule-bg]'));
@@ -62,7 +106,8 @@ export function menuScreen(container, ctx) {
     const btn = event.target.closest('[data-action]');
     if (btn) {
       const action = btn.dataset.action;
-      if (action === 'start' || action === 'map') ctx.screens.show('map');
+      // Кнопка «Начать» ведёт в карту того раздела, что выбран
+      if (action === 'start') ctx.screens.show('map');
       if (action === 'about') modal.hidden = false;
       return;
     }
@@ -74,8 +119,6 @@ export function menuScreen(container, ctx) {
 
   /**
    * Рассыпать минусы из центра ION по всему экрану.
-   * Частицы живут в полноэкранном слое .ion-field, поэтому ничто
-   * их не обрезает и они улетают до краёв экрана.
    */
   function emitElectrons(ion) {
     const rect = ion.getBoundingClientRect();
@@ -105,8 +148,14 @@ export function menuScreen(container, ctx) {
 
   container.addEventListener('click', onClick);
   return {
+    onShow() {
+      mode = ctx.game.mode ?? 'shift';
+      modeSwitch.setMode(mode);
+      applyModeText();
+    },
     dispose() {
       container.removeEventListener('click', onClick);
+      modeSwitch.destroy();
       moleculeField.destroy();
     },
   };

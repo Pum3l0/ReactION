@@ -1,0 +1,447 @@
+/* ==========================================================================
+   ReactION — раздел «Лаборатория» и переключатель режимов
+   Стиль «средний»: тёмная основа проекта + холодные стекло и металл.
+   ========================================================================== */
+
+/* --- Переключатель Смена / Лаборатория --- */
+.mode-switch {
+  position: relative;
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border-radius: var(--md-shape-full);
+  background: var(--md-surface-container-low);
+  border: 1px solid var(--md-outline-variant);
+  box-shadow: var(--md-elevation-1), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  isolation: isolate;
+}
+
+.mode-switch-thumb {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.3rem;
+  height: calc(100% - 0.6rem);
+  border-radius: var(--md-shape-full);
+  background: linear-gradient(180deg, #4a4023, #3a3420);
+  border: 1px solid rgba(242, 208, 104, 0.35);
+  box-shadow: var(--md-glow);
+  z-index: -1;
+  transition: transform var(--md-dur-medium) var(--md-ease-emphasized),
+    width var(--md-dur-medium) var(--md-ease-emphasized);
+}
+
+.mode-switch-tab {
+  position: relative;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 0.55rem 1.4rem;
+  border: none;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  border-radius: var(--md-shape-full);
+  cursor: pointer;
+  transition: color var(--md-dur-short) var(--md-ease-standard);
+}
+
+.mode-switch-tab:hover { color: var(--md-on-surface); }
+.mode-switch-tab[aria-selected='true'] { color: var(--md-on-primary-container); }
+.mode-switch-tab:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 3px; }
+
+/* ==========================================================================
+   Экран лаборатории
+   ========================================================================== */
+
+#screen-lab {
+  flex-direction: column;
+  background: transparent;
+  pointer-events: none;
+}
+
+#screen-lab > * { pointer-events: auto; }
+
+.lab-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.1rem 1.4rem;
+  background: linear-gradient(180deg, rgba(18, 22, 29, 0.9), transparent);
+  pointer-events: none;
+}
+
+.lab-topbar > * { pointer-events: auto; }
+.lab-topbar .mode-switch { margin-inline: auto; }
+.lab-back { flex-shrink: 0; }
+
+.lab-tip {
+  position: absolute;
+  left: 1.4rem;
+  bottom: 1.4rem;
+  max-width: 22rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--md-shape-md);
+  background: rgba(26, 33, 43, 0.86);
+  border: 1px solid var(--md-outline-variant);
+  backdrop-filter: blur(6px);
+  font-family: var(--font-ui);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--md-on-surface-variant);
+}
+
+.lab-tip strong { color: var(--md-primary); font-weight: 600; }
+
+.lab-task {
+  position: absolute;
+  right: 1.4rem;
+  top: 5.2rem;
+  width: min(24rem, 40vw);
+  padding: 1.2rem 1.3rem 1.4rem;
+  border-radius: var(--md-shape-lg);
+  background: rgba(26, 33, 43, 0.9);
+  border: 1px solid var(--md-outline-variant);
+  box-shadow: var(--md-elevation-3);
+  backdrop-filter: blur(8px);
+}
+
+.lab-task-title {
+  font-family: var(--font-headline);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.2rem;
+  color: var(--md-primary);
+  margin: 0 0 0.5rem;
+}
+
+.lab-task-master { display: flex; gap: 0.75rem; margin-bottom: 0.9rem; }
+
+.lab-task-portrait {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--md-shape-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--md-outline-variant);
+}
+
+.lab-task-brief {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--md-on-surface);
+  margin: 0;
+}
+
+.lab-task-status {
+  margin-top: 0.9rem;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  min-height: 1.2em;
+  color: var(--md-on-surface-variant);
+}
+
+.lab-task-status.is-ok { color: var(--md-tertiary); }
+.lab-task-status.is-fail { color: var(--md-error); }
+
+.lab-task-result {
+  margin-top: 0.9rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--md-shape-md);
+  background: var(--md-tertiary-container);
+  border: 1px solid rgba(154, 209, 138, 0.4);
+}
+
+.lab-task-result[hidden] { display: none; }
+
+.lab-task-result .lab-eq {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--md-on-tertiary-container);
+  margin: 0 0 0.35rem;
+}
+
+.lab-task-result .lab-obs {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  color: var(--md-on-surface-variant);
+  margin: 0;
+}
+
+.lab-task-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
+.lab-shelf {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 1.2rem;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  border-radius: var(--md-shape-lg);
+  background: rgba(26, 33, 43, 0.86);
+  border: 1px solid var(--md-outline-variant);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--md-elevation-2);
+}
+
+.lab-shelf[hidden] { display: none; }
+
+.lab-reagent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 5.2rem;
+  padding: 0.55rem 0.3rem 0.6rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-md);
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  cursor: grab;
+  transition: transform var(--md-dur-short) var(--md-ease-emphasized),
+    border-color var(--md-dur-short) var(--md-ease-standard),
+    box-shadow var(--md-dur-short) var(--md-ease-standard);
+}
+
+.lab-reagent:hover {
+  transform: translateY(-3px);
+  border-color: var(--md-primary);
+  box-shadow: var(--md-elevation-2);
+}
+
+.lab-reagent:active { cursor: grabbing; transform: translateY(-1px) scale(0.97); }
+.lab-reagent.is-picked { border-color: var(--md-primary); box-shadow: var(--md-glow); }
+
+.lab-reagent-vial {
+  width: 26px;
+  height: 40px;
+  border-radius: 6px 6px 8px 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-top: none;
+  position: relative;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  overflow: hidden;
+}
+
+.lab-reagent-vial::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 7px;
+  border-radius: 3px 3px 0 0;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.lab-reagent-vial::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 62%;
+  background: var(--vial-color, rgba(200, 220, 255, 0.35));
+  opacity: 0.9;
+  border-radius: 0 0 7px 7px;
+}
+
+.lab-reagent-name {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--md-on-surface);
+}
+
+.lab-reagent-sub {
+  font-family: var(--font-ui);
+  font-size: 0.64rem;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--md-on-surface-variant);
+}
+
+/* --- Кнопки-сосуды: запасной способ налить --- */
+.lab-vessels {
+  position: absolute;
+  right: 1.4rem;
+  bottom: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border-radius: var(--md-shape-lg);
+  background: rgba(26, 33, 43, 0.8);
+  border: 1px solid var(--md-outline-variant);
+  backdrop-filter: blur(6px);
+}
+
+.lab-vessel-btn {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-full);
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--md-dur-short) var(--md-ease-standard),
+    background var(--md-dur-short) var(--md-ease-standard);
+}
+
+.lab-vessel-btn:hover {
+  border-color: var(--md-primary);
+  background: var(--md-surface-bright);
+}
+
+/* ==========================================================================
+   Адаптив лаборатории: планшет и телефон (альбомная ориентация)
+   ========================================================================== */
+
+/* Планшет */
+@media (max-width: 1024px) {
+  .lab-task { width: min(20rem, 42vw); top: 4.8rem; right: 1rem; padding: 1rem; }
+  .lab-task-title { font-size: 1.05rem; }
+  .lab-tip { max-width: 18rem; font-size: 0.8rem; }
+}
+
+/* Телефон / узкий экран */
+@media (max-width: 760px) {
+  .lab-task {
+    width: min(17rem, 52vw);
+    top: 4.2rem;
+    right: 0.6rem;
+    padding: 0.85rem;
+  }
+  .lab-task-title { font-size: 0.98rem; margin-bottom: 0.35rem; }
+  .lab-task-brief { font-size: 0.82rem; }
+  .lab-task-portrait { width: 36px; height: 36px; }
+  .lab-task-status { font-size: 0.78rem; margin-top: 0.6rem; }
+
+  .lab-shelf { gap: 0.35rem; padding: 0.5rem; bottom: 0.7rem; }
+  .lab-reagent { width: 4.1rem; padding: 0.4rem 0.2rem 0.45rem; }
+  .lab-reagent-vial { width: 22px; height: 32px; }
+  .lab-reagent-name { font-size: 0.72rem; }
+  .lab-reagent-sub { font-size: 0.58rem; }
+
+  .lab-vessels {
+    right: 0.6rem;
+    bottom: 0.7rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-width: 40vw;
+    padding: 0.45rem;
+  }
+  .lab-vessel-btn { font-size: 0.72rem; padding: 0.4rem 0.6rem; }
+
+  .lab-tip { display: none; }
+}
+
+/* Совсем низкий экран (альбомный телефон) */
+@media (max-height: 520px) {
+  .lab-task { top: 3.6rem; padding: 0.7rem; }
+  .lab-task-master { margin-bottom: 0.5rem; }
+  .lab-task-brief { font-size: 0.78rem; line-height: 1.35; }
+  .lab-task-actions { margin-top: 0.6rem; }
+  .lab-shelf { bottom: 0.5rem; padding: 0.4rem; }
+}
+
+/* ==========================================================================
+   Надпись результата реакции (сверху по центру)
+   ========================================================================== */
+.lab-readout {
+  position: absolute;
+  top: 4.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: var(--md-shape-lg);
+  background: rgba(20, 26, 34, 0.94);
+  border: 1px solid var(--md-outline-variant);
+  box-shadow: var(--md-elevation-3);
+  backdrop-filter: blur(8px);
+  max-width: min(38rem, 82vw);
+  text-align: center;
+  z-index: 5;
+}
+
+.lab-readout[hidden] { display: none; }
+
+.lab-readout-line {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--md-on-surface);
+}
+
+.lab-readout--mix {
+  color: var(--md-primary);
+  font-weight: 600;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--md-outline-variant);
+  margin-bottom: 0.15rem;
+}
+
+.lab-readout--precipitate { color: #7fc4ff; }
+.lab-readout--gas { color: #d3f2c6; }
+.lab-readout--indicator { color: #e8a6e0; }
+.lab-readout--neutral { color: var(--md-on-surface-variant); }
+.lab-readout--ok { color: var(--md-tertiary); font-weight: 600; }
+
+/* ==========================================================================
+   Кнопки посуды с нагревом
+   ========================================================================== */
+.lab-vessel-row {
+  display: flex;
+  gap: 0.3rem;
+  align-items: stretch;
+}
+
+.lab-vessel-row .lab-vessel-btn { flex: 1; }
+
+.lab-heat-btn {
+  font-size: 0.9rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-full);
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  transition: border-color var(--md-dur-short), background var(--md-dur-short);
+}
+
+.lab-heat-btn:hover {
+  border-color: #ff8a3d;
+  background: #3a2a1a;
+}
+
+/* ==========================================================================
+   Режим-полигон: щиток превращается в мирную подсказку
+   ========================================================================== */
+.lab-task.is-sandbox {
+  background: rgba(26, 33, 43, 0.82);
+}
+
+.lab-task.is-sandbox .lab-task-title {
+  color: var(--md-tertiary);
+}
+
+/* Лоток реагентов в полигоне скроллится: веществ много */
+.lab-shelf {
+  max-width: min(72rem, 92vw);
+  overflow-x: auto;
+  flex-wrap: nowrap;
+}
+
+.lab-shelf .lab-reagent { flex: 0 0 auto; }

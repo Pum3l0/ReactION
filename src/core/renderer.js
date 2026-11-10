@@ -48,6 +48,10 @@ export class Renderer {
 
     // Целевая и текущая позиция камеры для параллакса
     this._camBase = this.camera.position.clone();
+    // Куда смотрит камера при параллаксе. Экран лаборатории меняет эту
+    // точку, иначе после перезахода камера «улетала» под стол, глядя
+    // в жёстко зашитую точку (0, 1.4, 0) чужой сцены.
+    this._lookTarget = new THREE.Vector3(0, 1.4, 0);
     this._pointer = { x: 0, y: 0 };
     this._pointerTarget = { x: 0, y: 0 };
     // Когда включён false — камерой управляет активный экран (например, атом)
@@ -68,8 +72,14 @@ export class Renderer {
 
   /** Плавно перевести камеру в новую базовую позицию (при смене экрана). */
   setCameraPose({ position, lookAt, duration = 0.9 }) {
-    if (position) this._camBase.copy(position);
-    if (lookAt) this.camera.lookAt(lookAt);
+    if (position) {
+      this._camBase.copy(position);
+      this.camera.position.copy(position);
+    }
+    if (lookAt) {
+      this._lookTarget.set(lookAt.x, lookAt.y, lookAt.z);
+      this.camera.lookAt(this._lookTarget);
+    }
     // Резких переходов пока нет — позже тут будет GSAP-твин.
     void duration;
   }
@@ -87,6 +97,17 @@ export class Renderer {
   setParallax(enabled) {
     this._parallaxEnabled = enabled;
     if (enabled) this._camBase.copy(this.camera.position);
+  }
+
+  /**
+   * Задать точку, куда смотрит камера при параллаксе.
+   * Нужно экранам со своей сценой (лаборатория), чтобы камера не
+   * «улетала» в чужую точку при возврате на экран.
+   */
+  setLookTarget(x, y, z) {
+    this._lookTarget.set(x, y, z);
+    this._camBase.copy(this.camera.position);
+    this.camera.lookAt(this._lookTarget);
   }
 
   _onPointerMove(event) {
@@ -114,7 +135,7 @@ export class Renderer {
 
       this.camera.position.x = this._camBase.x + this._pointer.x * PARALLAX_STRENGTH;
       this.camera.position.y = this._camBase.y - this._pointer.y * PARALLAX_STRENGTH * 0.6;
-      this.camera.lookAt(0, 1.4, 0);
+      this.camera.lookAt(this._lookTarget);
     }
 
     for (const fn of this._updaters) fn(dt, elapsed);

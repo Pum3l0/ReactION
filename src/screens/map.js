@@ -1,26 +1,50 @@
-import { LOCATIONS } from '../data/locations.js';
+import { getLocationsByMode, getLocation, MODE_LABELS } from '../data/locations.js';
+import { createModeSwitch } from '../ui/modeSwitch.js';
 
 /**
  * Карта локаций — сетка карточек с превью.
  *
+ * Сверху — переключатель «Смена / Лаборатория»: он меняет набор карточек.
+ *
  * Превью:
  *  - склад: фон панорамы + маленький портрет Петровича;
- *  - Орбитарий: миниатюрный 3D-атом (CSS-имитация орбит);
+ *  - Орбитарий / стол: миниатюрный 3D-атом (CSS-имитация орбит);
  *  - неоткрытые: заглушка «скоро».
  */
 export function mapScreen(container, ctx) {
   container.id = 'screen-map';
 
+  let mode = ctx.game.mode ?? 'shift';
+
   container.innerHTML = `
     <div class="map-header">
-      <h2 class="map-heading">Локации</h2>
+      <h2 class="map-heading" data-map-heading>Локации</h2>
+      <div data-mode-switch></div>
       <button class="btn btn--ghost" data-action="back">← Меню</button>
     </div>
 
-    <div class="map-grid">
-      ${LOCATIONS.map((loc) => renderCard(loc)).join('')}
-    </div>
+    <div class="map-grid" data-map-grid></div>
   `;
+
+  const grid = container.querySelector('[data-map-grid]');
+  const heading = container.querySelector('[data-map-heading]');
+
+  const modeSwitch = createModeSwitch({
+    mode,
+    onMode: (id) => {
+      mode = id;
+      ctx.game.setMode(id);
+      renderGrid();
+    },
+  });
+  container.querySelector('[data-mode-switch]').replaceWith(modeSwitch);
+
+  function renderGrid() {
+    heading.textContent = MODE_LABELS[mode] ?? 'Локации';
+    grid.innerHTML = getLocationsByMode(mode).map((loc) => renderCard(loc)).join('');
+  }
+
+  renderGrid();
 
   function renderCard(loc) {
     if (!loc.unlocked) {
@@ -62,8 +86,11 @@ export function mapScreen(container, ctx) {
   const onClick = (event) => {
     const card = event.target.closest('[data-location]');
     if (card) {
-      const loc = LOCATIONS.find((l) => l.id === card.dataset.location);
+      const loc = getLocation(card.dataset.location);
       if (!loc?.screen) return;
+      // Локация принадлежит разделу — синхронизируем режим, чтобы экран
+      // лаборатории знал, работать с заданием или как полигон.
+      if (loc.mode) ctx.game.setMode(loc.mode);
       ctx.game.setLocation(loc.id);
       ctx.screens.show(loc.screen);
       return;
@@ -74,5 +101,16 @@ export function mapScreen(container, ctx) {
   };
 
   container.addEventListener('click', onClick);
-  return { dispose: () => container.removeEventListener('click', onClick) };
+  return {
+    onShow() {
+      // Режим мог смениться с другого экрана — синхронизируем
+      mode = ctx.game.mode ?? 'shift';
+      modeSwitch.setMode(mode);
+      renderGrid();
+    },
+    dispose() {
+      container.removeEventListener('click', onClick);
+      modeSwitch.destroy();
+    },
+  };
 }

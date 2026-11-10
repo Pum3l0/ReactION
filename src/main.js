@@ -3,6 +3,8 @@ import './styles/base.css';
 import './styles/menu.css';
 import './styles/screens.css';
 import './styles/orbital.css';
+import './styles/lab.css';
+import './styles/responsive.css';
 
 import { Renderer } from './core/renderer.js';
 import { createLighting } from './core/lighting.js';
@@ -10,10 +12,13 @@ import { SceneManager } from './scenes/sceneManager.js';
 import { ScreenManager, createEvents } from './core/screenManager.js';
 import { Game } from './core/game.js';
 
+import { initDeviceWatcher } from './core/device.js';
+
 import { menuScreen } from './screens/menu.js';
 import { mapScreen } from './screens/map.js';
 import { levelScreen } from './screens/level.js';
 import { orbitalScreen } from './screens/orbital.js';
+import { labScreen } from './screens/lab.js';
 
 /* --------------------------------------------------------------------------
  * ReactION — точка входа.
@@ -39,12 +44,21 @@ screens.register('menu', menuScreen);
 screens.register('map', mapScreen);
 screens.register('level', levelScreen);
 screens.register('orbital', orbitalScreen);
+// Орбитарий продублирован в раздел «Лаборатория» (тот же экран, другой id).
+// Так тренажёр по строению атома живёт и в «Смене», и в лаборатории.
+screens.register('orbital-lab', orbitalScreen);
+// Экран лаборатории один, но работает в двух режимах (см. ctx.game.mode):
+//  - 'lab-shift': задания от мастера (раздел «Смена»)
+//  - 'lab':       свободный полигон (раздел «Лаборатория»)
+screens.register('lab', labScreen);
+screens.register('lab-shift', labScreen);
 
-// Сцена следует за активным экраном: меняется только 3D-фон меню/карты.
-// Сами локации рисуются панорамой внутри экрана уровня.
+// Экраны, владеющие собственной 3D-сценой и камерой: для них фоновую
+// диораму меню/карты нужно спрятать, иначе она мелькает за столом.
+const OWN_SCENE_SCREENS = new Set(['orbital', 'orbital-lab', 'lab', 'lab-shift']);
+
 events.on('screen:changed', (id) => {
-  // Орбитарий владеет собственной 3D-сценой и камерой
-  if (id === 'orbital') {
+  if (OWN_SCENE_SCREENS.has(id)) {
     scenes.hide();
     return;
   }
@@ -59,6 +73,15 @@ screens.show('menu');
 renderer.onUpdate((_dt, elapsed) => {
   lighting.key.intensity = 55 + Math.sin(elapsed * 1.4) * 5;
 });
+
+// Следим за устройством и ориентацией: на телефоне в портрете показываем
+// экран «поверни горизонтально», а 3D-сценам сообщаем о повороте.
+const deviceWatcher = initDeviceWatcher({
+  onChange: ({ device, orientation }) => {
+    ctx.events.emit('device:changed', { device, orientation });
+  },
+});
+ctx.device = deviceWatcher;
 
 // Доступ из консоли для отладки
 window.__reactIon = ctx;

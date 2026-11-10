@@ -28,7 +28,7 @@ services:
       start_period: 5s
 
 networks:
-  # Внешняя сеть, где живёт nginx-proxy-manager.
-  # Проверь имя: docker network ls
+  # Внешняя сеть, где живёт nginx-proxy-manager
   npm_network:
     external: true
+    name: npm_web_network

@@ -57,6 +57,11 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* --- Переключатель режимов прямо в меню --- */
+.menu-mode {
+  margin-top: 1.6rem;
+}
+
 /* --- Логотип: React + ION в кружке --- */
 .menu-logo {
   display: flex;
@@ -156,6 +161,9 @@
   color: var(--md-on-surface-variant);
   margin: 0.6rem 0 0;
   letter-spacing: 0.04em;
+  text-align: center;
+  max-width: 34rem;
+  padding-inline: 1rem;
 }
 
 .menu-buttons {
@@ -214,4 +222,23 @@
   opacity: 0.35;
   pointer-events: none;
   z-index: 3;
+}
+
+/* ==========================================================================
+   Адаптив меню: планшет и смартфон (альбомная ориентация)
+   ========================================================================== */
+@media (max-width: 900px) {
+  .menu-logo { font-size: clamp(2.4rem, 11vw, 4.5rem); }
+  .menu-mode { margin-top: 1.1rem; }
+  .menu-buttons { margin-top: 1.4rem; }
+  .menu-subtitle { font-size: clamp(0.9rem, 3vw, 1.1rem); }
+}
+
+/* Короткий экран (альбомный телефон) — сжимаем вертикальные отступы */
+@media (max-height: 560px) {
+  .menu-logo { font-size: clamp(2rem, 7vh, 3.2rem); }
+  .menu-mode { margin-top: 0.6rem; }
+  .menu-subtitle { margin-top: 0.3rem; }
+  .menu-buttons { margin-top: 0.9rem; gap: 0.5rem; }
+  .menu-about { padding: 1.2rem; gap: 0.7rem; }
 }
