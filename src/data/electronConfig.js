@@ -180,6 +180,155 @@ export function isShellCorrect(shellRecord, playerCells) {
  * Сгенерировать задание Орбитария.
  * @param {{withAnomaly?: boolean}} options
  */
+/**
+ * РАЗБОР КОНФИГУРАЦИИ, ВВЕДЁННОЙ ИГРОКОМ.
+ * Нужен для режима «песочница атома»: игрок пишет конфигурацию,
+ * а игра на лету угадывает элемент.
+ *
+ * Принимает строки вида: «1s2 2s2 2p6», «1s²2s²2p⁶» (надстрочные),
+ * «1s2,2s2,2p6». Возвращает разобранные подоболочки или ошибку.
+ */
+
+export const SUP_TO_DIGIT = { '⁰':0,'¹':1,'²':2,'³':3,'⁴':4,'⁵':5,'⁶':6,'⁷':7,'⁸':8,'⁹':9 };
+
+/** Привести строку к «нормальному» виду: надстрочные -> обычные цифры. */
+export function normalizeConfigInput(raw) {
+  return String(raw)
+    .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, (d) => String(SUP_TO_DIGIT[d]))
+    .replace(/[,;|]/g, ' ')
+    // «1s22s22p6» -> «1s2 2s2 2p6»: вставляем пробел перед новой подоболочкой
+    .replace(/([spdf])(\d+)(?=[1-7][spdf])/gi, '$1$2 ')
+    // «1s2 2s» без числа рядом — оставляем, обработаем как 0 электронов
+    .trim();
+}
+
+/**
+ * Разобрать конфигурацию.
+ * @param {string} raw
+ * @returns {{
+ *   ok: boolean,
+ *   error?: string,
+ *   shells: Array<{shell: string, electrons: number}>,
+ *   totalElectrons: number,
+ * }}
+ */
+export function parseConfig(raw) {
+  const text = normalizeConfigInput(raw);
+  if (!text) return { ok: false, error: 'Пусто — введи конфигурацию, например 1s2 2s2 2p6', shells: [], totalElectrons: 0 };
+
+  const tokens = text.split(/\s+/).filter(Boolean);
+  const shells = [];
+  let total = 0;
+
+  for (const tok of tokens) {
+    // Поддерживаем и «1s2», и «1s», и «1s 2» (число отдельно)
+    const m = tok.match(/^([1-7])([spdf])(\d{0,2})$/i);
+    if (!m) {
+      return { ok: false, error: `Не понимаю «${tok}». Формат: 1s2, 2s2, 2p6…`, shells: [], totalElectrons: 0 };
+    }
+    const shell = m[1] + m[2].toLowerCase();
+    const electrons = m[3] ? parseInt(m[3], 10) : 0;
+    const cap = CAPACITY[m[2].toLowerCase()];
+    if (electrons > cap) {
+      return { ok: false, error: `На ${shell} не может быть больше ${cap} электронов`, shells: [], totalElectrons: 0 };
+    }
+    shells.push({ shell, electrons });
+    total += electrons;
+  }
+
+  return { ok: true, shells, totalElectrons: total };
+}
+
+/**
+ * Угадать элемент по конфигурации.
+ * Возвращает ближайший нейтральный атом, ион или null.
+ * @returns {{
+ *   match: 'atom'|'ion'|'none',
+ *   z?: number, symbol?: string, name?: string,
+ *   charge?: number, ionLabel?: string,
+ *   expected?: string,
+ *   config?: string,
+ * }}
+ */
+export function identifyAtom(raw) {
+  const parsed = parseConfig(raw);
+  if (!parsed.ok) return { match: 'none', error: parsed.error };
+
+  const z = parsed.totalElectrons;
+  if (z === 0) return { match: 'none', error: 'Ноль электронов — так не бывает' };
+
+  // Точное совпадение с нейтральным атомом (учитываем аномалии).
+  // Сравниваем БЕЗ учёта порядка подоболочек — ученик может писать
+  // 3d раньше 4s, это одна и та же конфигурация.
+  if (z <= 118) {
+    const ref = buildConfig(z);
+    const refStr = configString(ref);
+    const userStr = configString({ shells: parsed.shells });
+    if (sameConfig(refStr, userStr)) {
+      return {
+        match: 'atom', z, symbol: ref.symbol, name: ref.name,
+        config: refStr, expected: refStr,
+      };
+    }
+    return {
+      match: 'ion',
+      z,
+      symbol: ref.symbol, name: ref.name,
+      config: userStr,
+      expected: refStr,
+      // По числу электронов ищем ближайший элемент в периодической таблице
+      charge: estimateCharge(z),
+      ionLabel: ionLabelFor(z),
+    };
+  }
+
+  return { match: 'none', error: `Слишком много электронов: ${z}` };
+}
+
+/** Собрать каноничную строку конфигурации из подоболочек. */
+export function configString({ shells }) {
+  return shells
+    .filter((s) => s.electrons > 0)
+    .map((s) => s.shell + s.electrons)
+    .join(' ');
+}
+
+/** Сравнить две конфигурации без учёта порядка подоболочек. */
+function sameConfig(a, b) {
+  const norm = (s) =>
+    s.split(' ').filter(Boolean).sort().join(' ');
+  return norm(a) === norm(b);
+}
+
+/** Простая оценка заряда иона по числу электронов (ближайший элемент). */
+function estimateCharge(electrons) {
+  // Ищем элемент, у которого Z ближе всего к числу электронов
+  let best = null;
+  for (const zStr of Object.keys(ELEMENTS)) {
+    const z = Number(zStr);
+    const diff = Math.abs(z - electrons);
+    if (diff <= 3 && (!best || diff < best.diff)) best = { z, diff };
+  }
+  return best ? best.z - electrons : 0;
+}
+
+/** Подпись иона: «Cu2+», «Cl-» и т.п. */
+function ionLabelFor(electrons) {
+  let best = null;
+  for (const zStr of Object.keys(ELEMENTS)) {
+    const z = Number(zStr);
+    const diff = Math.abs(z - electrons);
+    if (diff <= 3 && (!best || diff < best.diff)) best = { z, diff };
+  }
+  if (!best) return null;
+  const charge = best.z - electrons;
+  if (charge === 0) return null;
+  const [symbol] = ELEMENTS[best.z];
+  const sign = charge > 0 ? '+' : '\u2013';
+  const abs = Math.abs(charge);
+  return symbol + (abs > 1 ? abs : '') + sign;
+}
+
 export function generateOrbitalTask(options = {}) {
   const { withAnomaly = true } = options;
 

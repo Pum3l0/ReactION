@@ -8,6 +8,7 @@ import { describeResult } from '../core/chem/reactionEngine.js';
 import { createModeSwitch } from '../ui/modeSwitch.js';
 import { WindowManager } from '../core/windowManager.js';
 import { ReagentPanel } from '../ui/reagentPanel.js';
+import { createOnboarding, isOnboarded } from '../ui/onboarding.js';
 
 /**
  * Экран «Лаборатория» — рабочий стол химика в 3D.
@@ -50,6 +51,7 @@ export function labScreen(container, ctx) {
   let solved = false;
   let windows = null;
   let panel = null;
+  let onboarding = null;
 
   function currentReagentIds() {
     return isSandbox() ? allReagentIds() : task.reagents;
@@ -60,14 +62,26 @@ export function labScreen(container, ctx) {
       '<button class="btn btn--ghost lab-back" data-action="back">← Карта</button>' +
       '<div data-mode-switch></div>' +
       '<button class="btn btn--ghost" data-action="tables">📋 Таблицы</button>' +
+      '<button class="btn btn--ghost" data-action="journal">📓 Журнал</button>' +
       '<button class="btn btn--ghost" data-action="reset">⟳ Слить всё</button>' +
     '</div>' +
+
+    // Журнал опытов (панель справа, скрыта)
+    '<aside class="lab-journal" data-journal hidden>' +
+      '<div class="lab-journal-head">' +
+        '<h3>Журнал опытов</h3>' +
+        '<button class="lab-panel-close" data-action="journal-close">‹</button>' +
+      '</div>' +
+      '<div class="lab-journal-list" data-journal-list></div>' +
+    '</aside>' +
 
     // Индикатор «в руке» + надпись результата
     '<div class="lab-hand" data-hand hidden></div>' +
     '<div class="lab-readout" data-readout hidden></div>' +
 
     '<aside class="lab-task" data-task>' +
+      // На телефоне щиток можно свернуть, чтобы не закрывать стол
+      '<button class="lab-task-collapse" data-action="fold-task" aria-label="Свернуть задание">–</button>' +
       '<h3 class="lab-task-title" data-task-title></h3>' +
       '<div class="lab-task-master" data-task-master>' +
         '<img class="lab-task-portrait" src="/textures/props/petrovich_head.webp" alt="Мастер">' +
@@ -111,9 +125,36 @@ export function labScreen(container, ctx) {
     obs: container.querySelector('[data-task-obs]'),
     actions: container.querySelector('[data-task-actions]'),
     vessels: container.querySelector('[data-vessels]'),
+    journal: container.querySelector('[data-journal]'),
+    journalList: container.querySelector('[data-journal-list]'),
     next: container.querySelector('[data-action="next"]'),
     check: container.querySelector('[data-action="check"]'),
   };
+
+  /** Показать журнал выполненных опытов. */
+  function renderJournal() {
+    els.journal.hidden = false;
+    const log = state?.log ?? [];
+    if (!log.length) {
+      els.journalList.innerHTML = '<p class="lab-journal-empty">Пока пусто. Смешай вещества, и реакции попадут сюда.</p>';
+      return;
+    }
+    els.journalList.innerHTML = log.slice().reverse().map((entry, i) => {
+      const left = entry.reagentIds.map((id) => REAGENTS[id]?.formula ?? id).join(' + ');
+      const right = entry.reactions.map((r) => {
+        const sym = r.kind === 'precipitate' ? '\u2193' : r.kind === 'gas' ? '\u2191' : '';
+        return (r.formula ?? r.product ?? '') + sym;
+      }).join(' + ');
+      const note = entry.reactions.map((r) => r.name).filter(Boolean).join(', ');
+      return '<div class="lab-journal-entry">' +
+        '<span class="lab-journal-num">' + (log.length - i) + '</span>' +
+        '<div class="lab-journal-body">' +
+          '<span class="lab-journal-eq">' + left + ' \u2192 ' + right + '</span>' +
+          '<span class="lab-journal-note">' + note + '</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
 
   // ==================================================================
   // Панель реагентов (слева, с поиском и категориями)
@@ -133,10 +174,12 @@ export function labScreen(container, ctx) {
   // 3D: стол
   // ==================================================================
   function setupScene() {
-    ctx.renderer.scene.fog = new THREE.Fog(0x141a22, 9, 24);
+    ctx.renderer.scene.fog = new THREE.Fog(0x141a22, 11, 28);
     ctx.renderer.scene.background = new THREE.Color(0x141a22);
-    ctx.renderer.camera.position.set(0, 3.4, 8.4);
-    ctx.renderer.setLookTarget(0, 1.4, -0.4);
+    // Камера отодвинута и центрирована: ряд сосудов + горелка справа
+    // должны целиком попадать в кадр, включая фильтр и магнит на столе.
+    ctx.renderer.camera.position.set(0, 4.0, 10.5);
+    ctx.renderer.setLookTarget(0, 1.2, 0.4);
     ctx.renderer.setParallax(true);
 
     lab = buildLab(ctx.renderer.scene);
@@ -243,8 +286,11 @@ export function labScreen(container, ctx) {
     if (!state) return;
     if (!picked) { setStatus('Сначала выбери вещество в панели слева.', 'fail'); return; }
     const reagentId = picked;
+    const vessel = lab.getVessel(vesselId);
     const res = state.pour(reagentId, vesselId, 6);
     if (!res.ok) { setStatus(res.reason ?? 'Не получилось налить.', 'fail'); return; }
+    // Короткое мигание сосуда — отклик на действие
+    if (vessel) flashVessel(vessel);
     setStatus('Налил ' + (REAGENTS[reagentId]?.formula ?? reagentId) +
       '. Кликни сосуд ещё раз — нальётся порция, или выбери другое вещество.');
     updateReadout(vesselId);
@@ -336,27 +382,313 @@ export function labScreen(container, ctx) {
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
+  // Плоскость, по которой таскаем сосуды (на высоте стола)
+  const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const dragPoint = new THREE.Vector3();
+  const dragOffset = new THREE.Vector3();
 
-  function onStageClick(event) {
-    if (!state || !picked) return;
-    if (event.target.closest('.lab-topbar, .lab-task, .lab-vessels, .lab-tip, .window, .lab-panel')) return;
+  let drag = null;    // { vessel, moved } — перетаскивание сосуда
+  let panelDrag = null; // { reagentId } — тянем реактив из панели в сосуд
+  let downAt = null;  // { x, y } — где нажали (отличить клик от drag)
+
+  function pickVesselAt(event) {
     pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
     pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
     raycaster.setFromCamera(pointer, ctx.renderer.camera);
     const hits = raycaster.intersectObjects(lab.vessels.map((v) => v.group), true);
-    if (!hits.length) return;
+    if (!hits.length) return null;
     let obj = hits[0].object;
     while (obj && !lab.vessels.some((v) => v.group === obj)) obj = obj.parent;
-    const vessel = lab.vessels.find((v) => v.group === obj);
-    if (vessel) pourToVessel(vessel.id);
+    return lab.vessels.find((v) => v.group === obj) ?? null;
+  }
+
+  /** Точка пересечения луча с плоскостью стола. */
+  function planePoint(event, out) {
+    pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointer, ctx.renderer.camera);
+    return raycaster.ray.intersectPlane(dragPlane, out);
+  }
+
+  /** Сосуд под курсором, с допуском (на телефоне палец крупный). */
+  function vesselUnderPointer(event, tolerance = 0.35) {
+    const v = pickVesselAt(event);
+    if (v) return v;
+    // Приблизительная проверка: ближайший сосуд в проекции экрана
+    let best = null;
+    let bestDist = Infinity;
+    for (const vessel of lab.vessels) {
+      const p = vessel.group.position.clone();
+      p.y += 0.6;
+      p.project(ctx.renderer.camera);
+      const sx = (p.x * 0.5 + 0.5) * window.innerWidth;
+      const sy = (-p.y * 0.5 + 0.5) * window.innerHeight;
+      const d = Math.hypot(sx - event.clientX, sy - event.clientY);
+      if (d < bestDist) { bestDist = d; best = vessel; }
+    }
+    return bestDist < 120 * tolerance / 0.35 ? best : null;
+  }
+
+  function onPointerDown(event) {
+    if (!state) return;
+    // Клик по интерфейсу — не наша забота
+    if (event.target.closest('.lab-topbar, .lab-task, .lab-vessels, .lab-tip, .window')) return;
+
+    // Начало drag реактива из панели
+    const item = event.target.closest('.lab-item[data-id]');
+    if (item) {
+      const id = item.dataset.id;
+      pickReagent(id);
+      panelDrag = { reagentId: picked, started: false };
+      downAt = { x: event.clientX, y: event.clientY };
+      return;
+    }
+    if (event.target.closest('.lab-panel')) return;
+
+    downAt = { x: event.clientX, y: event.clientY };
+    const vessel = pickVesselAt(event);
+    if (!vessel) return;
+
+    // Реагент в руке: клик по сосуду = налить (не тащим сосуд)
+    if (picked) {
+      pourToVessel(vessel.id);
+      downAt = null;
+      return;
+    }
+
+    // Тащим сосуд — в том числе СНЯТЬ с горелки (нагрев выключится при движении)
+    const hit = planePoint(event, dragPoint);
+    if (!hit) return;
+    drag = { vessel, moved: false, homePos: vessel.group.position.clone() };
+    dragOffset.set(
+      vessel.group.position.x - dragPoint.x,
+      0,
+      vessel.group.position.z - dragPoint.z,
+    );
+    document.body.style.cursor = 'grabbing';
+  }
+
+  function onPointerMove(event) {
+    // Drag реактива из панели — показываем «носим»
+    if (panelDrag && downAt) {
+      const dist = Math.hypot(event.clientX - downAt.x, event.clientY - downAt.y);
+      if (dist > 6) panelDrag.started = true;
+      const v = vesselUnderPointer(event);
+      container.querySelectorAll('.lab-vessel-row').forEach((r) => r.classList.remove('is-target'));
+      if (v && panelDrag.started) {
+        const row = els.vessels.querySelector('[data-vessel="' + v.id + '"]')?.closest('.lab-vessel-row');
+        row?.classList.add('is-target');
+      }
+      return;
+    }
+    if (!drag) return;
+    if (!drag.moved && downAt) {
+      const dist = Math.hypot(event.clientX - downAt.x, event.clientY - downAt.y);
+      if (dist > 4) drag.moved = true;
+    }
+    // Если начали двигать сосуд, который на горелке — снимаем его нагрев
+    if (drag.moved && drag.vessel.onBurner) {
+      state.stopHeating(drag.vessel.id);
+      drag.vessel.onBurner = false;
+    }
+    const hit = planePoint(event, dragPoint);
+    if (!hit) return;
+    drag.vessel.group.position.x = dragPoint.x + dragOffset.x;
+    drag.vessel.group.position.z = dragPoint.z + dragOffset.z;
+
+    // Подсветка сосуда-цели: если тащим на другой сосуд, оба «загораются»
+    if (drag.moved) {
+      const other = vesselNear(drag.vessel, 1.1);
+      lab.vessels.forEach((v) => highlightVessel(v, false));
+      if (other) {
+        highlightVessel(other, true, 'target');
+        highlightVessel(drag.vessel, true, 'source');
+      } else {
+        // Подсветка горелки, если тащим туда
+        const p = drag.vessel.group.position;
+        const nearBurner = Math.hypot(p.x - lab.heatSpot.x, p.z - lab.heatSpot.z) < 1.3;
+        highlightBurner(nearBurner);
+      }
+    }
+  }
+
+  /** Ближайший к данному сосуду другой сосуд в радиусе dist. */
+  function vesselNear(main, dist) {
+    let best = null, bestD = dist;
+    for (const o of lab.vessels) {
+      if (o === main) continue;
+      const d = Math.hypot(
+        main.group.position.x - o.group.position.x,
+        main.group.position.z - o.group.position.z,
+      );
+      if (d < bestD) { bestD = d; best = o; }
+    }
+    return best;
+  }
+
+  /** Короткое мигание сосуда при наливании. */
+  function flashVessel(vessel) {
+    const glass = vessel.group.getObjectByName('glass');
+    if (!glass?.material) return;
+    if (!glass.material.emissive) glass.material.emissive = new THREE.Color(0x445566);
+    const proxy = { v: 0.9 };
+    gsap.to(proxy, {
+      v: 0, duration: 0.6, ease: 'power2.out',
+      onUpdate() { glass.material.emissiveIntensity = proxy.v; },
+    });
+  }
+
+  /** Подсветить стекло сосуда (emissive-свечение). */
+  function highlightVessel(vessel, on, mode = 'target') {
+    const glass = vessel.group.getObjectByName('glass');
+    if (!glass?.material) return;
+    if (on) {
+      glass.material.emissive = new THREE.Color(mode === 'source' ? 0x335533 : 0x665522);
+      glass.material.emissiveIntensity = 0.9;
+    } else {
+      glass.material.emissiveIntensity = 0;
+    }
+  }
+
+  function highlightBurner(on) {
+    const nozz = lab.burner?.children?.[2];
+    if (!nozz?.material) return;
+    nozz.material.emissive = new THREE.Color(0xff8a3d);
+    nozz.material.emissiveIntensity = on ? 0.8 : 0;
+  }
+
+  function onPointerUp(event) {
+    // Окончание drag реактива из панели
+    if (panelDrag && downAt) {
+      const wasDrag = panelDrag.started;
+      document.body.style.cursor = '';
+      container.querySelectorAll('.lab-vessel-row').forEach((r) => r.classList.remove('is-target'));
+      if (wasDrag && picked) {
+        const v = vesselUnderPointer(event);
+        if (v) pourToVessel(v.id);
+      }
+      // Если просто клик по карточке — реактив уже выбран (pickReagent выше)
+      panelDrag = null;
+      downAt = null;
+      return;
+    }
+
+    if (!drag) { downAt = null; return; }
+    const { vessel, moved } = drag;
+    document.body.style.cursor = '';
+
+    if (!moved) {
+      // Клик по сосуду без движения
+      if (picked) {
+        drag = null; downAt = null;
+        pourToVessel(vessel.id);
+        return;
+      }
+      // Клик по сосуду с содержимым и без реагента — перелив в другой сосуд
+      if (!vessel.isEmpty) {
+        drag = null; downAt = null;
+        setStatus('В ' + VESSEL_LABELS[vessel.id] + ' что-то есть. Потяни его к другому сосуду, чтобы перелить.');
+        return;
+      }
+      setStatus('Это ' + (VESSEL_LABELS[vessel.id] ?? 'сосуд') + '. Выбери вещество слева и кликни.');
+      drag = null; downAt = null;
+      return;
+    }
+
+    // Сосуд БРОШЕН. Определяем, на что он попал (тот же радиус, что и подсветка):
+    const droppedOn = vesselNear(vessel, 1.1);
+
+    lab.vessels.forEach((v) => highlightVessel(v, false));
+    highlightBurner(false);
+
+    if (droppedOn) {
+      // АНИМАЦИЯ ПЕРЕЛИВА: наклоняем сосуд к приёмнику, льём струйку.
+      if (!vessel.isEmpty) {
+        animatePour(vessel, droppedOn);
+      } else {
+        returnHome(vessel);
+      }
+      drag = null; downAt = null;
+      return;
+    }
+
+    const p = vessel.group.position;
+    const nearBurner = Math.hypot(p.x - lab.heatSpot.x, p.z - lab.heatSpot.z) < 1.15;
+
+    if (nearBurner) {
+      // Ставим на горелку — точно над пламенем
+      gsap.to(vessel.group.position, {
+        x: lab.heatSpot.x, y: 0.92, z: lab.heatSpot.z,
+        duration: 0.45, ease: 'power2.out',
+      });
+      if (!vessel.onBurner) {
+        const r = state.startHeating(vessel.id);
+        if (r.ok) { vessel.onBurner = true; setStatus(VESSEL_LABELS[vessel.id] + ' на горелке.'); }
+      }
+    } else {
+      returnHome(vessel);
+    }
+    drag = null;
+    downAt = null;
+  }
+
+  /** Вернуть сосуд на родное место (если он не на горелке). */
+  function returnHome(vessel) {
+    gsap.to(vessel.group.position, {
+      x: vessel.homePos.x, y: vessel.homePos.y, z: vessel.homePos.z,
+      duration: 0.4, ease: 'power2.out',
+    });
+  }
+
+  /**
+   * Анимация перелива: сосуд наклоняется к приёмнику, льётся струйка,
+   * затем содержимое переходит и сосуд возвращается на место.
+   */
+  function animatePour(from, to) {
+    const origRot = from.group.rotation.z;
+    const tilt = to.group.position.x < from.group.position.x ? 0.7 : -0.7;
+
+    // 1. Наклоняем к приёмнику
+    gsap.to(from.group.rotation, { z: tilt, duration: 0.3, ease: 'power2.out' });
+
+    // 2. Через мгновение показываем струйку
+    setTimeout(() => {
+      state.startPourStream(from, to);
+      // Цвет струйки — цвет жидкости
+      const c = from.liquid?.material?.color;
+      if (c && lab.pourStream?.mesh?.material) lab.pourStream.mesh.material.color.copy(c);
+
+      // 3. Наливаем постепенно (визуально уровень в приёмнике растёт)
+      const res = state.decant(from.id, to.id);
+      setStatus(res.ok
+        ? 'Перелили ' + VESSEL_LABELS[from.id] + ' → ' + VESSEL_LABELS[to.id] + '.'
+        : (res.reason ?? 'Не удалось перелить.'),
+        res.ok ? '' : 'fail');
+      updateReadout(to.id);
+    }, 320);
+
+    // 4. Убираем струйку и возвращаем сосуд
+    setTimeout(() => {
+      state.stopPourStream();
+      gsap.to(from.group.rotation, { z: origRot, duration: 0.3, ease: 'power2.out' });
+      returnHome(from);
+    }, 1000);
   }
 
   const onClick = (event) => {
     if (event.target.closest('[data-action="back"]')) { ctx.screens.show('map'); return; }
     if (event.target.closest('[data-action="tables"]')) { openTables(); return; }
+    if (event.target.closest('[data-action="journal"]')) { renderJournal(); return; }
+    if (event.target.closest('[data-action="journal-close"]')) { els.journal.hidden = true; return; }
     if (event.target.closest('[data-action="reset"]')) {
       state?.reset(); panel?.setPicked(null); picked = null; els.hand.hidden = true;
       els.readout.hidden = true; setStatus('Стол чист.'); return;
+    }
+    if (event.target.closest('[data-action="fold-task"]')) {
+      const folded = els.task.classList.toggle('is-folded');
+      const btn = els.task.querySelector('[data-action="fold-task"]');
+      if (btn) btn.textContent = folded ? '+' : '–';
+      return;
     }
     if (event.target.closest('[data-action="check"]')) { check(); return; }
     if (event.target.closest('[data-action="next"]')) { nextTask(); return; }
@@ -371,7 +703,23 @@ export function labScreen(container, ctx) {
   };
 
   container.addEventListener('click', onClick);
-  window.addEventListener('pointerdown', onStageClick);
+  window.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  window.addEventListener('pointercancel', onPointerUp);
+
+  /** Онбординг: короткие подсказки при первом заходе в лабораторию. */
+  function startOnboarding() {
+    const key = isSandbox() ? 'lab-sandbox' : 'lab-shift';
+    onboarding?.destroy();
+    onboarding = createOnboarding(key, [
+      { target: '.lab-panel-toggle', title: 'Шаг 1', text: 'Открой панель «Реактивы» — там все вещества.' },
+      { target: '.lab-shelf, .lab-panel', title: 'Шаг 2', text: 'Выбери вещество (или перетащи его прямо на сосуд).' },
+      { target: '.lab-vessels', title: 'Шаг 3', text: 'Кликни по сосуду, чтобы налить. 🔥 — нагрев, ⧗ — фильтр, 🧲 — магнит.' },
+      { target: '.lab-task', title: 'Шаг 4', text: 'В разделе «Смена» здесь задание мастера — выполни его и нажми «Проверить».' },
+    ], container);
+    onboarding.start();
+  }
 
   setupScene();
   renderTask();
@@ -386,6 +734,7 @@ export function labScreen(container, ctx) {
       setupScene();
       renderTask();
       buildPanel();
+      startOnboarding();
     },
     onHide() {
       teardownScene();
@@ -400,10 +749,14 @@ export function labScreen(container, ctx) {
     },
     dispose() {
       container.removeEventListener('click', onClick);
-      window.removeEventListener('pointerdown', onStageClick);
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
       modeSwitch.destroy();
       windows?.closeAll();
       panel?.destroy();
+      onboarding?.destroy();
       teardownScene();
     },
   };

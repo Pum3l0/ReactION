@@ -4,6 +4,7 @@ import './styles/menu.css';
 import './styles/screens.css';
 import './styles/orbital.css';
 import './styles/lab.css';
+import './styles/atomlab.css';
 import './styles/responsive.css';
 
 import { Renderer } from './core/renderer.js';
@@ -19,6 +20,7 @@ import { mapScreen } from './screens/map.js';
 import { levelScreen } from './screens/level.js';
 import { orbitalScreen } from './screens/orbital.js';
 import { labScreen } from './screens/lab.js';
+import { atomLabScreen } from './screens/atomLab.js';
 
 /* --------------------------------------------------------------------------
  * ReactION — точка входа.
@@ -52,10 +54,12 @@ screens.register('orbital-lab', orbitalScreen);
 //  - 'lab':       свободный полигон (раздел «Лаборатория»)
 screens.register('lab', labScreen);
 screens.register('lab-shift', labScreen);
+// Песочница атома: пишешь конфигурацию — игра угадывает элемент
+screens.register('atom-lab', atomLabScreen);
 
 // Экраны, владеющие собственной 3D-сценой и камерой: для них фоновую
 // диораму меню/карты нужно спрятать, иначе она мелькает за столом.
-const OWN_SCENE_SCREENS = new Set(['orbital', 'orbital-lab', 'lab', 'lab-shift']);
+const OWN_SCENE_SCREENS = new Set(['orbital', 'orbital-lab', 'lab', 'lab-shift', 'atom-lab']);
 
 events.on('screen:changed', (id) => {
   if (OWN_SCENE_SCREENS.has(id)) {

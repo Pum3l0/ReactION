@@ -9,6 +9,7 @@ import {
   spawnSteam,
   clearSteam,
 } from '../three/lab/effects.js';
+import { updateSolidGeometry } from '../three/lab/geometry.js';
 
 /**
  * Состояние лабораторного стола.
@@ -26,10 +27,44 @@ export class LabState {
     this.heating = new Set();      // id сосудов, стоящих на горелке
     this.lastResult = null;
     this.lastVesselId = null;
+    this.log = [];                 // журнал опытов: выполненные реакции
+  }
+
+  /**
+   * Записать реакцию в журнал (без дублей подряд).
+   * Нужно, чтобы ученик в конце видел список своих опытов и уравнений.
+   */
+  _logReaction(vessel, result) {
+    const key = vessel.reagentIds.join('+') + '|' + result.reactions.map((r) => r.formula ?? r.product ?? '').join(',');
+    if (this._lastLogKey === key) return;
+    this._lastLogKey = key;
+    const reacted = result.reactions.filter((r) => r.precipitate || r.gas || r.neutral);
+    if (!reacted.length) return;
+    this.log.push({
+      vessel: vessel.id,
+      reagentIds: [...vessel.reagentIds],
+      reactions: reacted.map((r) => ({
+        kind: r.precipitate ? 'precipitate' : r.gas ? 'gas' : 'neutral',
+        formula: r.formula,
+        name: r.name,
+        product: r.product,
+      })),
+      time: Date.now(),
+    });
+    if (this.log.length > 40) this.log.shift();
   }
 
   get vessels() {
     return this.lab.vessels;
+  }
+
+  /** Собрать «реагент» в том виде, в каком его принимает сосуд. */
+  _reagent(id) {
+    const r = REAGENTS[id] ?? {};
+    // state: 'solid' в данных -> phase: 'solid'; иначе — жидкость.
+    // Металлы (гранулы/стружка) — тоже твёрдые.
+    const isSolid = r.state === 'solid' || r.tags?.includes('metal');
+    return { id, phase: isSolid ? 'solid' : 'liquid' };
   }
 
   /** Налить реагент из склянки в сосуд. */
@@ -40,25 +75,34 @@ export class LabState {
     const free = vessel.capacity - vessel.volume;
     if (free <= 0) return { ok: false, reason: 'Сосуд полон' };
 
-    const added = vessel.add(reagentId, amount);
+    const added = vessel.add(this._reagent(reagentId), amount);
     if (added <= 0) return { ok: false, reason: 'Сосуд полон' };
 
     this._refresh(vessel);
     return { ok: true, added, full: vessel.capacity - vessel.volume <= 0 };
   }
 
-  /** Перелить из одного сосуда в другой. */
+  /**
+   * Перелить ВСЁ содержимое из одного сосуда в другой.
+   * Переносятся все реагенты с их фазами (жидкость и твёрдые).
+   */
   decant(fromId, toId) {
     const from = this.lab.getVessel(fromId);
     const to = this.lab.getVessel(toId);
-    if (!from || !to || from.isEmpty) return { ok: false };
+    if (!from || !to || from.isEmpty) return { ok: false, reason: 'Сосуд пуст' };
+    if (from.id === to.id) return { ok: false, reason: 'Это один и тот же сосуд' };
 
-    const added = to.add(from.reagentIds[0], from.volume);
-    if (added <= 0) return { ok: false, reason: 'Сосуд полон' };
+    let movedAny = 0;
+    for (const c of from.contents) {
+      const added = to.add({ id: c.id, phase: c.phase }, c.amount);
+      movedAny += added;
+    }
+    if (movedAny <= 0) return { ok: false, reason: 'В приёмнике нет места' };
+
     from.clear();
     this._refresh(from);
     this._refresh(to);
-    return { ok: true };
+    return { ok: true, moved: movedAny };
   }
 
   /** Полностью освободить сосуд. */
@@ -69,15 +113,34 @@ export class LabState {
     clearPrecipitate(vessel.group);
     clearSteam(vessel.group);
     this.stopHeating(vesselId);
-    // Мгновенно прячем жидкость
+    // Прячем и жидкость, и твёрдое
     vessel.liquid.userData.level = 0;
     setLiquidLevel(vessel.liquid, 0, 0.2);
     tintLiquid(vessel.liquid, 0xdfe9f0, 0.2);
+    if (vessel.solid) updateSolidGeometry(vessel.solid, 0);
     this.lastResult = null;
+  }
+
+  /** Показать струйку перелива между двумя сосудами. */
+  startPourStream(fromVessel, toVessel) {
+    const stream = this.lab.pourStream;
+    if (!stream) return;
+    const f = fromVessel.group.position.clone();
+    f.y += fromVessel.shape ? fromVessel.shape.height * 0.9 : 1.5;
+    const t = toVessel.group.position.clone();
+    t.y += 0.5;
+    stream.start(f, t);
+  }
+
+  stopPourStream() {
+    this.lab.pourStream?.stop();
   }
 
   reset() {
     for (const v of this.lab.vessels) this.empty(v.id);
+    // Убираем со стола материальные следы (фильтр, магнит)
+    this.lab.strainer?.clear();
+    this.lab.magnet?.clear();
   }
 
   /** Поставить сосуд на горелку: показываем пламя и/или пар. */
@@ -108,8 +171,22 @@ export class LabState {
   }
 
   _refresh(vessel) {
+    // 1. Уровень жидкости (только жидкая часть содержимого)
     setLiquidLevel(vessel.liquid, vessel.level);
 
+    // 2. Твёрдое на дне: горка из частиц (порошок/гранулы/стружка)
+    const solids = vessel.contents.filter((c) => c.phase === 'solid');
+    if (solids.length && vessel.solid) {
+      // Цвет — от первого твёрдого (металл — серый, соли — их цвет)
+      const first = REAGENTS[solids[0].id];
+      vessel.solid.material.color.setHex(first?.color ?? 0xcfcfcf);
+      const variant = first?.tags?.includes('metal') ? 'granule' : 'powder';
+      updateSolidGeometry(vessel.solid, vessel.solidLevel, variant);
+    } else if (vessel.solid) {
+      updateSolidGeometry(vessel.solid, 0);
+    }
+
+    // 3. Химреакция по всему содержимому
     const result = computeMixture(vessel.reagentIds);
     this.lastResult = result;
     this.lastVesselId = vessel.id;
@@ -119,16 +196,19 @@ export class LabState {
     clearPrecipitate(vessel.group);
     const precip = result.reactions.find((r) => r.precipitate && r.color);
     if (precip) {
-      spawnPrecipitate(vessel.group, precip.color, precip.precipitate === 'weak', vessel.liquid);
+      spawnPrecipitate(vessel.group, precip.color, precip.precipitate === 'weak', vessel);
     }
 
     const gas = result.reactions.find((r) => r.gas);
     if (gas) this._startGas(vessel, gas.bubbles);
+
+    // Пишем реакцию в журнал опытов
+    this._logReaction(vessel, result);
   }
 
   _startGas(vessel, color) {
     if (this.gasSprites.has(vessel.id)) return;
-    const { mesh, tick } = spawnGas(vessel.group, color, vessel.liquid, (m) => {
+    const { mesh, tick } = spawnGas(vessel.group, color, vessel, (m) => {
       m.geometry.dispose();
       m.material.dispose();
       vessel.group.remove(m);
@@ -157,6 +237,9 @@ export class LabState {
       .find((r) => r?.color && !r.tags?.includes('metal'));
     tintLiquid(vessel.liquid, dissolved?.color ?? 0xe8f2ff);
 
+    // Материальный след: на столе появляется воронка с осадком на фильтре.
+    this.lab.strainer?.setPrecipitate(precip.color, precip.name ?? precip.formula);
+
     vessel.filtrate = precip.formula;
     return { ok: true, precipitate: precip.name ?? precip.formula };
   }
@@ -176,6 +259,8 @@ export class LabState {
     if (!hadMetal) return { ok: false, reason: 'Магниту тут нечего притягивать' };
 
     const removed = before - vessel.contents.length;
+    // Материальный след: магнит с прилипшей стружкой лежит на столе.
+    this.lab.magnet?.setFilings(true);
     // Пересчитываем состояние после извлечения металла
     if (vessel.contents.length) {
       this._refresh(vessel);

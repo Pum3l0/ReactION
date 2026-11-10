@@ -166,7 +166,11 @@ export function createVessel(kind = 'tube') {
   const liquid = createLiquidMesh(kind, shape);
   group.add(liquid);
 
-  return { group, liquid, kind, shape };
+  // Твёрдое вещество (порошок/гранулы/стружка) — отдельный меш на дне
+  const solid = createSolidMesh(kind, 0x9a9a9a);
+  group.add(solid);
+
+  return { group, liquid, solid, kind, shape };
 }
 
 /**
@@ -226,6 +230,78 @@ export function updateLiquidGeometry(liquid, level) {
   if (liquid.geometry && liquid.geometry !== geo) liquid.geometry.dispose();
   liquid.geometry = geo;
   liquid.visible = true;
+}
+
+/**
+ * Твёрдое вещество на дне сосуда: горка частиц (порошок/гранулы/стружка).
+ * Используем InstancedMesh — дёшево и выглядит как настоящая насыпь.
+ */
+export function createSolidMesh(kind, color) {
+  const shape = (SHAPES[kind] ?? tubeShape)();
+  const isGranule = kind !== 'flask';
+
+  const geo = isGranule
+    ? new THREE.DodecahedronGeometry(0.055, 0)   // гранулы/стружка
+    : new THREE.SphereGeometry(0.045, 6, 5);      // порошок в колбе
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: color ?? 0x9a9a9a,
+    roughness: 0.85,
+    metalness: kind === 'metal' ? 0.7 : 0.15,
+    flatShading: true,
+  });
+
+  const COUNT = 40;
+  const mesh = new THREE.InstancedMesh(geo, mat, COUNT);
+  mesh.name = 'solid';
+  mesh.visible = false;
+  mesh.userData.shape = shape;
+  mesh.userData.kind = kind;
+  mesh.userData.count = COUNT;
+  mesh.userData.level = 0;
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+/**
+ * Перестроить горку твёрдого вещества под «уровень» 0..1.
+ * Частицы насыпаются на дно и лежат в конусе, а не по всему объёму.
+ */
+export function updateSolidGeometry(solid, level, variant = 'powder') {
+  if (!solid) return;
+  const shape = solid.userData.shape;
+  if (!shape) return;
+  const clamped = Math.max(0, Math.min(level, 1));
+  if (clamped < 0.02) { solid.visible = false; return; }
+
+  const count = solid.userData.count;
+  const active = Math.max(2, Math.round(count * clamped));
+  const R = shape.radiusAt(shape.height * 0.12) * 0.82; // радиус у дна
+  const heap = Math.min(clamped, 0.5) * shape.height * 0.5; // высота горки
+
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < count; i++) {
+    if (i >= active) {
+      dummy.scale.setScalar(0);
+      dummy.position.set(0, -10, 0);
+      dummy.updateMatrix();
+      solid.setMatrixAt(i, dummy.matrix);
+      continue;
+    }
+    // Горка: ближе к центру — выше
+    const r = Math.sqrt(Math.random()) * R;
+    const a = Math.random() * Math.PI * 2;
+    const hFactor = 1 - r / R;
+    const y = 0.02 + Math.random() * Math.max(heap * hFactor, 0.02);
+    dummy.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
+    dummy.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+    dummy.scale.setScalar(variant === 'granule' ? 1 : 0.8 + Math.random() * 0.5);
+    dummy.updateMatrix();
+    solid.setMatrixAt(i, dummy.matrix);
+  }
+  solid.instanceMatrix.needsUpdate = true;
+  solid.visible = true;
+  solid.userData.level = clamped;
 }
 
 export function createStand() {

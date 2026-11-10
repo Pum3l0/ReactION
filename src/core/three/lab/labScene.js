@@ -6,7 +6,12 @@ import {
   createBurner,
   createReagentBottle,
 } from './geometry.js';
-import { createFlame } from './effects.js';
+import {
+  createFlame,
+  createPourStream,
+  createStrainer,
+  createMagnet,
+} from './effects.js';
 import { REAGENTS } from '../../../data/reactions.js';
 
 /**
@@ -17,9 +22,10 @@ import { REAGENTS } from '../../../data/reactions.js';
  */
 
 export class LabVessel {
-  constructor({ group, liquid, kind, shape, capacity, id }) {
+  constructor({ group, liquid, solid, kind, shape, capacity, id }) {
     this.group = group;
     this.liquid = liquid;
+    this.solid = solid;       // твёрдое вещество на дне (порошок/гранулы)
     this.kind = kind;
     this.shape = shape;       // профиль сосуда (radiusAt, height)
     this.capacity = capacity; // мл
@@ -40,15 +46,35 @@ export class LabVessel {
     return this.contents.length === 0;
   }
 
-  get level() {
-    return Math.min(this.volume / this.capacity, 1);
+  /** Есть ли среди содержимого жидкость (для уровня жидкости). */
+  get hasLiquid() {
+    return this.contents.some((c) => c.phase === 'liquid');
   }
 
-  add(reagentId, amount) {
+  /** Доля объёма только жидких реагентов. */
+  get liquidVolume() {
+    return this.contents.filter((c) => c.phase === 'liquid').reduce((s, c) => s + c.amount, 0);
+  }
+
+  /** Уровень жидкости 0..1 (только жидкая часть). */
+  get level() {
+    return Math.min(this.liquidVolume / this.capacity, 1);
+  }
+
+  /** Уровень твёрдого (для горки на дне). */
+  get solidLevel() {
+    const solidVol = this.contents.filter((c) => c.phase === 'solid').reduce((s, c) => s + c.amount, 0);
+    return Math.min(solidVol / (this.capacity * 0.5), 1);
+  }
+
+  add(reagent, amount) {
     const free = this.capacity - this.volume;
     const take = Math.max(0, Math.min(amount, free));
     if (take <= 0) return 0;
-    this.contents.push({ id: reagentId, amount: take });
+    // Сливаем одинаковые реагенты в одну запись
+    const existing = this.contents.find((c) => c.id === reagent.id);
+    if (existing) existing.amount += take;
+    else this.contents.push({ id: reagent.id, amount: take, phase: reagent.phase ?? 'liquid' });
     return take;
   }
 
@@ -96,35 +122,58 @@ export function buildLab(scene) {
   clampLo.position.copy(stand.position);
   root.add(clampHi, clampLo);
 
+  // ГОРЕЛКА: справа на переднем крае, рядом с сосудами — чтобы было видно,
+  // что́ именно ставят на огонь. Раньше она была сзади (z=-0.6), и пробирки
+  // казались сбоку от неё.
+  const BURNER_X = 3.2;
+  const ROW_Z = 0.9; // передний ряд: на нём стоят сосуды и горелка
   const burnerGroup = createBurner();
-  burnerGroup.position.set(0, 0.12, -0.6);
+  burnerGroup.position.set(BURNER_X, 0.12, ROW_Z);
   root.add(burnerGroup);
 
   const flame = createFlame();
-  flame.group.position.set(0, 0.95, -0.6);
+  flame.group.position.set(BURNER_X, 0.95, ROW_Z);
   root.add(flame.group);
 
+  // ВСЕ сосуды в один ряд на столе, на одной высоте. Их можно свободно
+  // передвигать мышью и переливать содержимое друг в друга.
   const vessels = [];
   const vesselSpecs = [
-    { kind: 'tube', pos: [-2.5, 2.0, -0.6], capacity: 30, id: 'tube-a' },
-    { kind: 'tube', pos: [-2.72, 1.1, -0.6], capacity: 30, id: 'tube-b' },
-    { kind: 'beaker', pos: [0.9, 0.12, 0.9], capacity: 60, id: 'beaker' },
-    { kind: 'flask', pos: [2.1, 0.12, 0.6], capacity: 100, id: 'flask' },
+    { kind: 'tube', pos: [-3.4, 0.12, ROW_Z], capacity: 30, id: 'tube-a' },
+    { kind: 'tube', pos: [-2.6, 0.12, ROW_Z], capacity: 30, id: 'tube-b' },
+    { kind: 'beaker', pos: [-1.2, 0.12, ROW_Z], capacity: 60, id: 'beaker' },
+    { kind: 'flask', pos: [0.9, 0.12, ROW_Z], capacity: 100, id: 'flask' },
   ];
   for (const spec of vesselSpecs) {
-    const { group, liquid, kind, shape } = createVessel(spec.kind);
+    const { group, liquid, solid, kind, shape } = createVessel(spec.kind);
     group.position.set(spec.pos[0], spec.pos[1], spec.pos[2]);
-    if (spec.kind === 'tube') group.rotation.z = 0.04;
     root.add(group);
-    const vessel = new LabVessel({ group, liquid, kind, shape, capacity: spec.capacity, id: spec.id });
+    const vessel = new LabVessel({ group, liquid, solid, kind, shape, capacity: spec.capacity, id: spec.id });
     vessel.homePos = group.position.clone();
     vessels.push(vessel);
   }
 
   scene.add(root);
 
-  // Позиция над горелкой, куда «перелетает» сосуд при нагреве
-  const heatSpot = new THREE.Vector3(0, 0.95, -0.6);
+  // Точка «на горелке» — ровно над пламенем, откуда хорошо видно сосуд
+  const heatSpot = new THREE.Vector3(BURNER_X, 0.95, ROW_Z);
+
+  // Дополнительные объекты на столе (фильтр с осадком, магнит) — скрыты,
+  // появляются по ходу опыта на своих местах.
+  const accessories = new THREE.Group();
+  accessories.name = 'lab-accessories';
+  root.add(accessories);
+
+  const strainer = createStrainer();
+  strainer.group.position.set(2.4, 0.12, ROW_Z - 1.4);
+  accessories.add(strainer.group);
+
+  const magnet = createMagnet();
+  magnet.group.position.set(-2.0, 0.12, ROW_Z - 1.5);
+  accessories.add(magnet.group);
+
+  // Струйка при переливании (в мировых координатах)
+  const pourStream = createPourStream(root);
 
   return {
     root,
@@ -132,6 +181,10 @@ export function buildLab(scene) {
     burner: burnerGroup,
     flame,
     heatSpot,
+    accessories,
+    strainer,
+    magnet,
+    pourStream,
     getVessel(id) {
       return vessels.find((v) => v.id === id);
     },

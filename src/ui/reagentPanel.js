@@ -145,9 +145,15 @@ export class ReagentPanel {
       .map((id) => {
         const r = REAGENTS[id];
         const on = id === this.picked ? ' is-picked' : '';
+        // Разный вид: жидкость — флакон, бумага (лакмус) — полоска, порошок — горка
+        const icon = r.form === 'paper'
+          ? '<span class="lab-item-paper" style="--paper-color:' + vialColorVar(r.color) + '"></span>'
+          : r.state === 'solid'
+            ? '<span class="lab-item-powder" style="--powder-color:' + vialColorVar(r.color) + '"></span>'
+            : '<span class="lab-item-vial" style="--vial-color:' + vialColorVar(r.color) + '"></span>';
         return (
           '<button class="lab-item' + on + '" data-id="' + id + '">' +
-            '<span class="lab-item-vial" style="--vial-color:' + vialColorVar(r.color) + '"></span>' +
+            icon +
             '<span class="lab-item-text">' +
               '<span class="lab-item-formula">' + r.formula + '</span>' +
               '<span class="lab-item-name">' + r.name + '</span>' +

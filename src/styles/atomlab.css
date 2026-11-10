@@ -1,0 +1,234 @@
+/* ==========================================================================
+   Песочница атома — ввод конфигурации и живое распознавание
+   ========================================================================== */
+
+#screen-atom-lab {
+  flex-direction: column;
+  background: transparent;
+  pointer-events: none;
+}
+#screen-atom-lab > * { pointer-events: auto; }
+
+/* --- Панель слева: ввод и распознавание --- */
+.atom-panel {
+  position: absolute;
+  left: 1.4rem;
+  top: 5.2rem;
+  width: min(24rem, 40vw);
+  padding: 1.2rem 1.3rem 1.3rem;
+  border-radius: var(--md-shape-lg);
+  background: rgba(16, 22, 30, 0.92);
+  border: 1px solid var(--md-outline-variant);
+  box-shadow: var(--md-elevation-3);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.atom-panel-title {
+  font-family: var(--font-headline);
+  font-style: italic;
+  font-weight: 600;
+  font-size: 1.3rem;
+  color: var(--md-primary);
+  margin: 0;
+}
+
+.atom-panel-hint {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--md-on-surface-variant);
+  margin: 0;
+}
+
+.atom-input {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-md);
+  background: var(--md-surface-container-lowest);
+  color: var(--md-on-surface);
+  outline: none;
+}
+.atom-input:focus {
+  border-color: var(--md-primary);
+  box-shadow: 0 0 0 3px rgba(242, 208, 104, 0.18);
+}
+.atom-input::placeholder { color: var(--md-on-surface-variant); opacity: 0.6; }
+
+/* Быстрые кнопки-подоболочки */
+.atom-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.atom-chip {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--md-shape-full);
+  background: var(--md-surface-container);
+  color: var(--md-on-surface);
+  cursor: pointer;
+  transition: all var(--md-dur-short);
+}
+.atom-chip:hover { border-color: var(--md-primary); background: var(--md-surface-bright); }
+.atom-chip:active { transform: scale(0.95); }
+
+/* Распознавание на лету */
+.atom-recognized {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--md-shape-md);
+  background: var(--md-surface-container-low);
+  border: 1px solid var(--md-outline-variant);
+  transition: border-color var(--md-dur-medium), background var(--md-dur-medium);
+}
+.atom-recognized.is-ok {
+  border-color: var(--md-tertiary);
+  background: var(--md-tertiary-container);
+}
+.atom-recognized.is-ion {
+  border-color: #7fc4ff;
+  background: rgba(30, 50, 70, 0.7);
+}
+.atom-recognized.is-error {
+  border-color: var(--md-error);
+  background: rgba(60, 25, 20, 0.6);
+}
+
+.atom-recog-symbol {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--md-primary);
+  min-width: 2.4rem;
+  text-align: center;
+  line-height: 1;
+}
+.atom-recognized.is-ok .atom-recog-symbol { color: var(--md-on-tertiary-container); }
+.atom-recognized.is-ion .atom-recog-symbol { color: #a8d4ff; }
+
+.atom-recog-text {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--md-on-surface);
+}
+
+.atom-actions { display: flex; gap: 0.5rem; }
+.atom-actions .btn { flex: 1; }
+
+.atom-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--md-outline-variant);
+}
+.atom-examples-label {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  color: var(--md-on-surface-variant);
+  margin-right: 0.2rem;
+}
+.atom-example {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px dashed var(--md-outline-variant);
+  border-radius: var(--md-shape-sm);
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+}
+.atom-example:hover { border-color: var(--md-primary); color: var(--md-primary); }
+
+/* --- Крупный результат после «Готово» --- */
+.atom-result {
+  position: absolute;
+  right: 1.6rem;
+  top: 5.2rem;
+  width: min(20rem, 34vw);
+  padding: 1.4rem 1.5rem;
+  border-radius: var(--md-shape-lg);
+  background: rgba(16, 22, 30, 0.94);
+  border: 1px solid var(--md-primary);
+  box-shadow: var(--md-glow), var(--md-elevation-3);
+  backdrop-filter: blur(10px);
+  text-align: center;
+  animation: atomResultIn 0.5s var(--md-ease-emphasized);
+}
+.atom-result[hidden] { display: none; }
+
+@keyframes atomResultIn {
+  from { opacity: 0; transform: translateY(-16px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.atom-result-symbol {
+  font-family: var(--font-display);
+  font-size: 3.4rem;
+  font-weight: 800;
+  color: var(--md-primary);
+  line-height: 1;
+  text-shadow: 0 0 30px rgba(242, 208, 104, 0.5);
+}
+.atom-result-name {
+  font-family: var(--font-headline);
+  font-style: italic;
+  font-size: 1.2rem;
+  color: var(--md-on-surface);
+  margin-top: 0.3rem;
+}
+.atom-result-config {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  color: var(--md-on-surface-variant);
+  margin-top: 0.6rem;
+  word-break: break-word;
+}
+.atom-result-note {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--md-on-surface-variant);
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+/* ==========================================================================
+   Адаптив
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .atom-panel { width: min(20rem, 46vw); top: 4.8rem; padding: 1rem; }
+  .atom-result { width: min(16rem, 34vw); padding: 1.1rem; top: 4.8rem; }
+}
+
+@media (max-width: 760px) {
+  .atom-panel {
+    left: 0.5rem; right: 0.5rem; top: auto; bottom: 0.5rem;
+    width: auto; padding: 0.8rem; gap: 0.55rem;
+  }
+  .atom-panel-title { font-size: 1.05rem; }
+  .atom-panel-hint { font-size: 0.78rem; }
+  .atom-input { font-size: 0.92rem; padding: 0.6rem 0.7rem; }
+  .atom-recog-symbol { font-size: 1.5rem; min-width: 1.8rem; }
+  .atom-recog-text { font-size: 0.76rem; }
+  .atom-examples { display: none; }
+
+  .atom-result {
+    left: 0.5rem; right: 0.5rem; top: 4rem; width: auto;
+    padding: 1rem;
+  }
+  .atom-result-symbol { font-size: 2.6rem; }
+}

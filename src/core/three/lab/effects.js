@@ -44,38 +44,46 @@ export function setLiquidLevel(liquid, level, duration = 0.35) {
   liquid.userData.level = level;
 }
 
-/** Радиус сосуда на уровне «верх жидкости» — для осадка и газа. */
-function liquidRadius(liquid) {
-  const s = liquid?.userData?.shape;
-  if (!s) return 0.2;
-  const top = (liquid.userData.level ?? 0.3) * s.height * 0.9;
-  return Math.max(s.radiusAt(top), 0.05);
+/** Достать профиль сосуда (у меша или у самого сосуда). */
+function shapeOf(vessel) {
+  return vessel?.shape ?? vessel?.userData?.shape ?? null;
 }
 
-/** Высота уровня жидкости в 3D-единицах (для газа и осадка). */
-function liquidTop(liquid) {
-  const s = liquid?.userData?.shape;
+/** Радиус сосуда на данной высоте (с запасом внутрь, чтобы не вылезти). */
+function radiusAtHeight(vessel, y) {
+  const s = shapeOf(vessel);
+  if (!s) return 0.2;
+  return Math.max(s.radiusAt(y) * 0.92, 0.04);
+}
+
+/** Высота жидкости в 3D-единицах. */
+function liquidTop(vessel) {
+  const s = shapeOf(vessel);
+  const liquid = vessel?.liquid ?? vessel;
   if (!s) return 0.6;
-  return Math.max((liquid.userData.level ?? 0.3) * s.height * 0.94, 0.1);
+  const lvl = liquid?.userData?.level ?? vessel?.level ?? 0.3;
+  return Math.max(lvl * s.height * 0.94, 0.02);
 }
 
 /**
  * Осадок: облако частиц, оседающее на дно сосуда.
  * Радиус подобран под текущий сосуд — в колбе осадок шире, чем в пробирке.
  */
-export function spawnPrecipitate(parent, color, weak = false, liquid = null) {
+export function spawnPrecipitate(parent, color, weak = false, vessel = null) {
   const cfg = weak ? EFFECTS.weak : EFFECTS.precipitate;
   const n = cfg.particles;
-  const R = liquidRadius(liquid) * 0.85;
+  const topY = liquidTop(vessel);
 
+  // Старт: частицы распределены в толще раствора, но ВНУТРИ профиля сосуда.
   const positions = new Float32Array(n * 3);
   const starts = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
+    const y = 0.03 + Math.random() * Math.max(topY, 0.15);
+    const rMax = radiusAtHeight(vessel, y) * 0.9;
     const angle = Math.random() * Math.PI * 2;
-    const radius = Math.random() * R;
+    const radius = Math.sqrt(Math.random()) * rMax;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
-    const y = 0.1 + Math.random() * Math.max(R * 1.5, 0.4);
     positions[i * 3] = x;
     positions[i * 3 + 1] = y;
     positions[i * 3 + 2] = z;
@@ -87,9 +95,10 @@ export function spawnPrecipitate(parent, color, weak = false, liquid = null) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
+  const baseSize = radiusAtHeight(vessel, 0.1);
   const mat = new THREE.PointsMaterial({
     color,
-    size: weak ? 0.028 : 0.042,
+    size: weak ? baseSize * 0.16 : baseSize * 0.22,
     transparent: true,
     opacity: 0,
     depthWrite: false,
@@ -103,6 +112,7 @@ export function spawnPrecipitate(parent, color, weak = false, liquid = null) {
   const attr = geo.attributes.position;
   gsap.to(mat, { opacity: cfg.cloudAlpha, duration: 0.45, ease: 'power2.out' });
 
+  // Оседание: каждая частица идёт вниз, оставаясь внутри профиля (без разлёта).
   const proxy = { t: 0 };
   gsap.to(proxy, {
     t: 1,
@@ -111,10 +121,13 @@ export function spawnPrecipitate(parent, color, weak = false, liquid = null) {
     onUpdate() {
       const t = proxy.t;
       for (let i = 0; i < n; i++) {
-        const base = starts[i * 3 + 1];
-        attr.array[i * 3] = starts[i * 3] * (1 + t * 0.3);
-        attr.array[i * 3 + 1] = 0.02 + (base - 0.02) * (1 - t);
-        attr.array[i * 3 + 2] = starts[i * 3 + 2] * (1 + t * 0.3);
+        const startY = starts[i * 3 + 1];
+        const y = 0.02 + (startY - 0.02) * (1 - t);
+        // горизонтально НЕ разлетаемся; чуть подтягиваем к центру у дна
+        const pull = 0.85 + 0.15 * (1 - t);
+        attr.array[i * 3] = starts[i * 3] * pull;
+        attr.array[i * 3 + 1] = y;
+        attr.array[i * 3 + 2] = starts[i * 3 + 2] * pull;
       }
       attr.needsUpdate = true;
     },
@@ -135,13 +148,14 @@ export function clearPrecipitate(parent) {
  * Газ: пузырьки, всплывающие в жидкости. Возвращает { mesh, tick(dt) }.
  * Пузырьки появляются по всему сечению сосуда и всплывают до уровня жидкости.
  */
-export function spawnGas(parent, color, liquid, onFinished) {
+export function spawnGas(parent, color, vessel, onFinished) {
   const cfg = EFFECTS.gas;
   const count = cfg.bubbleCount;
-  const R = liquidRadius(liquid) * 0.8;
-  const topY = liquidTop(liquid);
+  const topY = liquidTop(vessel);
+  // Радиус на уровне дна, чтобы пузырьки не вылезали за стекло
+  const R = radiusAtHeight(vessel, 0.1) * 0.8;
 
-  const geo = new THREE.SphereGeometry(Math.max(R * 0.14, 0.02), 8, 6);
+  const geo = new THREE.SphereGeometry(Math.max(R * 0.16, 0.02), 8, 6);
   const mat = new THREE.MeshPhysicalMaterial({
     color: color ?? 0xffffff,
     transparent: true,
@@ -286,4 +300,193 @@ export function clearSteam(parent) {
   old.geometry.dispose();
   old.material.dispose();
   parent.remove(old);
+}
+
+/* ==========================================================================
+   Анимация перелива, фильтр и магнит — «материальные» следы процессов
+   ========================================================================== */
+
+/**
+ * Струйка жидкости из носика носика (from) в приёмник (to).
+ * Живёт в мировых координатах сцены, поэтому parent — корень лаборатории.
+ * @returns {{ mesh, tick(dt), stop() }}
+ */
+export function createPourStream(parent, color) {
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: color ?? 0x9fd2f0,
+    transparent: true,
+    opacity: 0.75,
+    roughness: 0.1,
+    transmission: 0.5,
+    depthWrite: false,
+  });
+
+  // Струя — тонкий цилиндр, который будем растягивать между точками
+  const geo = new THREE.CylinderGeometry(0.035, 0.025, 1, 8, 1, true);
+  geo.translate(0, 0.5, 0); // точка отсчёта — низ
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = 'pour-stream';
+  mesh.visible = false;
+  parent.add(mesh);
+
+  const from = new THREE.Vector3();
+  const to = new THREE.Vector3();
+  const mid = new THREE.Vector3();
+  const dir = new THREE.Vector3();
+  const q = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+
+  let active = false;
+
+  function update() {
+    dir.subVectors(to, from);
+    const len = dir.length();
+    if (len < 0.001) return;
+    mid.addVectors(from, to).multiplyScalar(0.5);
+    mesh.position.copy(from);
+    mesh.scale.set(1, len, 1);
+    q.setFromUnitVectors(up, dir.clone().normalize());
+    mesh.quaternion.copy(q);
+  }
+
+  return {
+    mesh,
+    start(fromV, toV) {
+      from.copy(fromV); to.copy(toV);
+      active = true;
+      mesh.visible = true;
+      update();
+    },
+    move(fromV, toV) {
+      if (!active) return;
+      from.copy(fromV); to.copy(toV);
+      update();
+    },
+    stop() {
+      active = false;
+      mesh.visible = false;
+    },
+    get active() { return active; },
+    dispose() {
+      geo.dispose(); mat.dispose(); parent.remove(mesh);
+    },
+  };
+}
+
+/**
+ * Фильтр (воронка с бумажным фильтром) — материальный след фильтрования.
+ * Ставится на стол; на бумаге собирается осадок нужного цвета.
+ * @returns {{ group, setPrecipitate(color, name), clear(), dispose() }}
+ */
+export function createStrainer() {
+  const group = new THREE.Group();
+  group.name = 'strainer';
+  group.visible = false;
+
+  // Стеклянная воронка — конус
+  const glass = new THREE.MeshPhysicalMaterial({
+    color: 0xdfe9f0, transparent: true, opacity: 0.35,
+    roughness: 0.1, transmission: 0.85, thickness: 0.4, side: THREE.DoubleSide,
+  });
+  const funnel = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.5, 20, 1, true), glass);
+  funnel.position.y = 0.65;
+  funnel.rotation.x = Math.PI; // носиком вниз
+  group.add(funnel);
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.45, 12, 1, true), glass);
+  neck.position.y = 0.22;
+  group.add(neck);
+
+  // Бумажный фильтр с осадком
+  const paperMat = new THREE.MeshStandardMaterial({ color: 0xf5f0e0, roughness: 0.9, side: THREE.DoubleSide });
+  const paper = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.42, 18, 1, true), paperMat);
+  paper.position.y = 0.68;
+  paper.rotation.x = Math.PI;
+  group.add(paper);
+
+  // Слой осадка на фильтре
+  const residueMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.95, side: THREE.DoubleSide });
+  const residue = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.2, 18, 1, true), residueMat);
+  residue.position.y = 0.72;
+  residue.rotation.x = Math.PI;
+  residue.visible = false;
+  group.add(residue);
+
+  return {
+    group,
+    setPrecipitate(color, name) {
+      residueMat.color.setHex(color ?? 0x888888);
+      residue.visible = true;
+      group.visible = true;
+      group.userData.residueName = name;
+    },
+    show() { group.visible = true; },
+    clear() {
+      residue.visible = false;
+      residueMat.color.setHex(0x888888);
+      group.visible = false;
+    },
+    dispose() {
+      group.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
+      group.parent?.remove(group);
+    },
+  };
+}
+
+/**
+ * Магнит — материальный след магнитного отделения.
+ * После «притягивания» на нём остаётся комок железной стружки.
+ */
+export function createMagnet() {
+  const group = new THREE.Group();
+  group.name = 'magnet';
+  group.visible = false;
+
+  // Подковообразный магнит: дуга + два полюса
+  const metal = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.4, metalness: 0.5 });
+  const arc = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.07, 10, 20, Math.PI), metal);
+  arc.position.y = 0.3;
+  group.add(arc);
+
+  const leg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.28, 12), metal);
+  leg1.position.set(-0.22, 0.18, 0);
+  group.add(leg1);
+  const leg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.28, 12), metal);
+  leg2.position.set(0.22, 0.18, 0);
+  group.add(leg2);
+
+  // Комок притянутой стружки
+  const filings = new THREE.Group();
+  filings.name = 'filings';
+  for (let i = 0; i < 16; i++) {
+    const f = new THREE.Mesh(
+      new THREE.BoxGeometry(0.02, 0.09, 0.02),
+      new THREE.MeshStandardMaterial({ color: 0x6b6b6b, roughness: 0.7, metalness: 0.8 }),
+    );
+    f.position.set((Math.random() - 0.5) * 0.3, 0.05 + Math.random() * 0.14, (Math.random() - 0.5) * 0.2);
+    f.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    filings.add(f);
+  }
+  filings.visible = false;
+  group.add(filings);
+
+  return {
+    group,
+    setFilings(on) {
+      filings.visible = on;
+      group.visible = on;
+    },
+    show() { group.visible = true; },
+    clear() { filings.visible = false; group.visible = false; },
+    dispose() {
+      group.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
+      group.parent?.remove(group);
+    },
+  };
 }

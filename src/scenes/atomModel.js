@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { distributeElectrons } from '../data/electronConfig.js';
 
 /**
  * 3D-модель атома для Орбитария.
@@ -252,6 +253,39 @@ export class AtomModel {
 
   }
 
+  /**
+   * ПОКАЗАТЬ ВЕСЬ АТОМ СРАЗУ (для режима-песочницы).
+   * Все подоболочки видны, все электроны стоят на местах по правилу Хунда,
+   * кольца раскрашены по типу (s/p/d/f). Активной (яркой) подоболочки нет.
+   */
+  showAll() {
+    // Собираем все подоболочки в один общий радиус — чтобы слои не
+    // наезжали друг на друга, но и были компактны.
+    this.shells.forEach((s, i) => {
+      s.visible = true;
+      s.solved = false;
+      s.group.visible = true;
+
+      const type = s.shell[1];
+      const color = SUBSHELL_COLORS[type] ?? PALETTE.shellActive;
+      s.group.traverse((o) => {
+        if (!o.material || !o.userData?.radius) return;
+        o.material.color.setHex(color);
+        o.material.opacity = 0.7;
+      });
+
+      // Заполняем электронами всю подоболочку по правилу Хунда
+      const cells = distributeElectrons(s.electronsTotal, s.cells);
+      this.setShellElectrons(i, cells);
+      // И растягиваем их ПО ВСЕМУ кольцу, а не по короткой дуге
+      for (const e of s.electronMeshes) {
+        e.t = (e.t - 0.06) / 0.88; // из диапазона дуги в 0..1
+        e.fullRing = true;
+      }
+    });
+    this.expanded = true;
+  }
+
   // ----------------------------------------------------------------
   // Электроны
   // ----------------------------------------------------------------
@@ -381,22 +415,32 @@ export class AtomModel {
     const pulse = 1 + Math.sin(this._time * 1.6) * 0.02;
     this.proton.scale.setScalar(pulse);
 
-    // Электроны ползут по дугам туда-сюда
+    // Электроны: в режиме-песочнице бегут по ВСЕМУ кольцу, в задании —
+    // ползут по дуге туда-сюда (их снимают по одному).
     for (const s of this.shells) {
       for (const e of s.electronMeshes) {
         if (!e.arcData) continue;
-        e.t += e.speed * dt;
-        if (e.t > 0.97 || e.t < 0.03) e.speed *= -1;
-        e.t = Math.min(Math.max(e.t, 0.02), 0.98);
-        // В финале — свободный бег по кругу, без разворота у краёв
-        if (this.expanded) {
+        const speed = e.fullRing ? 0.12 : e.speed;
+        e.t += speed * dt;
+
+        if (e.fullRing) {
+          // Полная окружность, без разворота
           if (e.t > 1) e.t -= 1;
           if (e.t < 0) e.t += 1;
+          const angle = e.arcData.startAngle + Math.PI * 2 * e.t;
+          const r = e.arcData.radius;
+          e.mesh.position.set(Math.cos(angle) * r, Math.sin(angle) * r, 0);
+        } else {
+          if (e.t > 0.97 || e.t < 0.03) e.speed *= -1;
+          e.t = Math.min(Math.max(e.t, 0.02), 0.98);
+          if (this.expanded) {
+            if (e.t > 1) e.t -= 1;
+            if (e.t < 0) e.t += 1;
+          }
+          const angle = e.arcData.startAngle + e.arcData.arcLength * e.t;
+          const r = e.arcData.radius;
+          e.mesh.position.set(Math.cos(angle) * r, Math.sin(angle) * r, 0);
         }
-
-        const angle = e.arcData.startAngle + e.arcData.arcLength * e.t;
-        const r = e.arcData.radius;
-        e.mesh.position.set(Math.cos(angle) * r, Math.sin(angle) * r, 0);
       }
     }
   }

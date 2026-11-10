@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 170" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2029"/><stop offset="1" stop-color="#141a22"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#dfe9f0" stop-opacity="0.5"/>
+      <stop offset="0.5" stop-color="#dfe9f0" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#dfe9f0" stop-opacity="0.5"/>
+    </linearGradient>
+    <radialGradient id="lamp" cx="0.5" cy="0" r="0.7">
+      <stop offset="0" stop-color="#ffc98a" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#ffc98a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="320" height="170" fill="url(#bg)"/>
+  <rect width="320" height="110" fill="url(#lamp)"/>
+  <!-- Полка сзади -->
+  <rect x="20" y="52" width="280" height="5" rx="2" fill="#2a3038"/>
+  <g>
+    <rect x="40" y="26" width="15" height="26" rx="4" fill="url(#glass)"/>
+    <rect x="70" y="30" width="15" height="22" rx="4" fill="url(#glass)"/>
+    <rect x="100" y="26" width="15" height="26" rx="4" fill="url(#glass)"/>
+  </g>
+  <!-- Столешница -->
+  <rect x="8" y="122" width="304" height="11" rx="3" fill="#3c4149"/>
+  <rect x="8" y="122" width="304" height="3" rx="1.5" fill="#9aa4b0" opacity="0.6"/>
+  <!-- Пробирка 1 -->
+  <g transform="translate(48,72)">
+    <path d="M-7 0 L-7 40 Q-7 48 0 48 Q7 48 7 40 L7 0" fill="url(#glass)" stroke="#dfe9f0" stroke-opacity="0.6" stroke-width="1.3"/>
+    <path d="M-5 22 L-5 40 Q-5 45 0 45 Q5 45 5 40 L5 22 Z" fill="#2f8fd6" opacity="0.75"/>
+  </g>
+  <!-- Пробирка 2 с осадком -->
+  <g transform="translate(76,84)">
+    <path d="M-7 0 L-7 30 Q-7 36 0 36 Q7 36 7 30 L7 0" fill="url(#glass)" stroke="#dfe9f0" stroke-opacity="0.6" stroke-width="1.3"/>
+    <path d="M-5 18 L-5 30 Q-5 34 0 34 Q5 34 5 30 L5 18 Z" fill="#2f8fd6" opacity="0.5"/>
+    <ellipse cx="0" cy="33" rx="5" ry="3.5" fill="#2f8fd6"/>
+  </g>
+  <!-- Колба -->
+  <g transform="translate(140,80)">
+    <circle cx="0" cy="24" r="22" fill="url(#glass)" stroke="#dfe9f0" stroke-opacity="0.6" stroke-width="1.3"/>
+    <path d="M-8 -6 L-8 -18 M8 -6 L8 -18" stroke="#dfe9f0" stroke-opacity="0.6" stroke-width="1.3"/>
+    <path d="M-20 28 Q0 16 20 28 A22 22 0 0 0 -20 28 Z" fill="#8b4a1e" opacity="0.7"/>
+  </g>
+  <!-- Стакан -->
+  <g transform="translate(210,92)">
+    <path d="M-15 0 L-12 30 L12 30 L15 0" fill="url(#glass)" stroke="#dfe9f0" stroke-opacity="0.6" stroke-width="1.3"/>
+    <path d="M-12 14 L-10.5 29 L10.5 29 L12 14 Z" fill="#4aa85a" opacity="0.6"/>
+  </g>
+  <!-- Горелка -->
+  <g transform="translate(278,100)">
+    <path d="M-4 0 L-5 18 L5 18 L4 0 Z" fill="#6b7280"/>
+    <rect x="-9" y="18" width="18" height="6" rx="2" fill="#6b7280"/>
+    <path d="M0 0 Q-6 -9 0 -18 Q6 -9 0 0 Z" fill="#ffdf8a"/>
+    <path d="M0 -2 Q-4 -9 0 -16 Q4 -9 0 -2 Z" fill="#ff9a3d" opacity="0.8"/>
+  </g>
+  <ellipse cx="160" cy="128" rx="130" ry="4" fill="#ffffff" opacity="0.04"/>
+</svg>

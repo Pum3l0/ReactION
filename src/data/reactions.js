@@ -29,6 +29,7 @@ export const IONS = {
   Mg:  { id: 'Mg',  charge: +2, label: 'Mg2+' },
   Al:  { id: 'Al',  charge: +3, label: 'Al3+' },
   Zn:  { id: 'Zn',  charge: +2, label: 'Zn2+' },
+  Ni:  { id: 'Ni',  charge: +2, label: 'Ni2+' },
   Cu:  { id: 'Cu',  charge: +2, label: 'Cu2+' },
   Fe2: { id: 'Fe2', charge: +2, label: 'Fe2+' },
   Fe3: { id: 'Fe3', charge: +3, label: 'Fe3+' },
@@ -45,6 +46,7 @@ export const IONS = {
   PO4: { id: 'PO4', charge: -3, label: 'PO4(3-)' },
   S:   { id: 'S',   charge: -2, label: 'S2-' },
   SiO3:{ id: 'SiO3',charge: -2, label: 'SiO3(2-)' },
+  MnO4:{ id: 'MnO4',charge: -1, label: 'MnO4-' },
 };
 
 /* --------------------------------------------------------------------------
@@ -86,11 +88,22 @@ export const REAGENTS = {
   znso4:  { formula: 'ZnSO4',  name: 'сульфат цинка',        color: null,     state: 'solid',  tags: ['salt'], ions: ['Zn', 'SO4'] },
   mgso4:  { formula: 'MgSO4',  name: 'сульфат магния',       color: null,     state: 'solid',  tags: ['salt'], ions: ['Mg', 'SO4'] },
   na2sio3:{ formula: 'Na2SiO3',name: 'силикат натрия',       color: null,     state: 'liquid', tags: ['salt'], ions: ['Na', 'SiO3'] },
+  cacl2:  { formula: 'CaCl2',  name: 'хлорид кальция',       color: null,     state: 'solid',  tags: ['salt'], ions: ['Ca', 'Cl'] },
+  alcl3:  { formula: 'AlCl3',  name: 'хлорид алюминия',      color: null,     state: 'solid',  tags: ['salt'], ions: ['Al', 'Cl'] },
+  niso4:  { formula: 'NiSO4',  name: 'сульфат никеля (II)',  color: 0x4aa85a, state: 'solid',  tags: ['salt'], ions: ['Ni', 'SO4'] },
+  kmno4:  { formula: 'KMnO4',  name: 'перманганат калия',    color: 0x8b2fa0, state: 'solid',  tags: ['salt'], ions: ['K', 'MnO4'] },  // марганцовка
+  caco3:  { formula: 'CaCO3',  name: 'карбонат кальция',     color: null,     state: 'solid',  tags: ['salt'], ions: ['Ca', 'CO3'] },  // мрамор/мел
 
-  // --- Индикаторы (тоже можно наливать в сосуд) ---
-  phenolphthalein: { formula: 'ф/фтал', name: 'фенолфталеин',   color: null, state: 'liquid', tags: ['indicator'], ions: [] },
-  litmus:          { formula: 'лакмус', name: 'лакмус',          color: null, state: 'liquid', tags: ['indicator'], ions: [] },
-  methylorange:    { formula: 'мет.оранж', name: 'метилоранж',  color: 0xf2c14e, state: 'liquid', tags: ['indicator'], ions: [] },
+  // --- Оксиды (твёрдые порошки) ---
+  cuo:    { formula: 'CuO',    name: 'оксид меди (II)',      color: 0x1c1c1c, state: 'solid',  tags: ['oxide'], ions: ['Cu'] },
+  fe2o3:  { formula: 'Fe2O3',  name: 'оксид железа (III)',   color: 0x9c3a1a, state: 'solid',  tags: ['oxide'], ions: ['Fe3'] },
+  cao:    { formula: 'CaO',    name: 'оксид кальция',        color: 0xf0efe8, state: 'solid',  tags: ['oxide'], ions: ['Ca'] },  // негашёная известь
+
+  // --- Индикаторы ---
+  // form: 'paper' — бумажная полоска (лакмус), 'solution' — раствор-капли.
+  phenolphthalein: { formula: 'ф/фтал',   name: 'фенолфталеин', color: null,    state: 'liquid', tags: ['indicator'], form: 'solution', ions: [] },
+  litmus:          { formula: 'лакмус',   name: 'лакмус (бумага)', color: 0x9a86c6, state: 'solid',  tags: ['indicator'], form: 'paper',    ions: [] },
+  methylorange:    { formula: 'мет.оранж', name: 'метилоранж',  color: 0xf2c14e, state: 'liquid', tags: ['indicator'], form: 'solution', ions: [] },
 
   // --- Металлы (для будущей механики вытеснения) ---
   zn:     { formula: 'Zn',     name: 'цинк (гранулы)',       color: 0x8b939c, state: 'solid',  tags: ['metal'], ions: ['Zn'] },
@@ -102,22 +115,26 @@ export const REAGENTS = {
  * ------------------------------------------------------------------------ */
 export const INDICATORS = {
   phenolphthalein: {
+    form: 'solution',
     formula: 'фенолфталеин',
     name: 'фенолфталеин',
     basicColor: 0xd6337f,   // малиновый в щёлочи
     acidColor: null,         // бесцветный в кислоте
   },
   litmus: {
+    form: 'paper',            // лакмус — бумажная полоска, нейтральная — фиолетовая
     formula: 'лакмус',
-    name: 'лакмус',
-    basicColor: 0x2f4fd6,   // синий в щёлочи
-    acidColor: 0xd63a2f,    // красный в кислоте
+    name: 'лакмус (бумага)',
+    neutralColor: 0x9a86c6,   // фиолетовый в нейтральной
+    basicColor: 0x2f4fd6,     // синий в щёлочи
+    acidColor: 0xd63a2f,      // красный в кислоте
   },
   methylorange: {
+    form: 'solution',
     formula: 'метилоранж',
     name: 'метиловый оранжевый',
-    basicColor: 0xf2c14e,   // жёлтый в щёлочи
-    acidColor: 0xd6452f,    // красный в кислоте
+    basicColor: 0xf2c14e,     // жёлтый в щёлочи
+    acidColor: 0xd6452f,      // красный в кислоте
   },
 };
 
@@ -175,6 +192,17 @@ export const SOLUBILITY = {
   'S|Zn':  { precipitate: true, color: 0xf2f2ee, formula: 'ZnS', name: 'сульфид цинка' },
   'S|Pb':  { precipitate: true, color: 0x2a2a2a, formula: 'PbS', name: 'сульфид свинца (II)' },
   'S|Fe2': { precipitate: true, color: 0x2a2a2a, formula: 'FeS', name: 'сульфид железа (II)' },
+
+  // --- Растворение оксидов в кислоте (оксид + H+ -> соль + вода) ---
+  // Считаем нейтрализацией: виден только факт растворения, без осадка.
+  'Cu|H':    { neutral: true, formula: 'CuSO4/Cl2', name: 'оксид меди растворяется в кислоте' },
+  'Fe3|H':   { neutral: true, formula: 'FeCl3/SO4',  name: 'оксид железа растворяется в кислоте' },
+  'Ca|H':    { neutral: true, formula: 'CaCl2',      name: 'оксид/карбонат кальция реагирует с кислотой' },
+
+  // --- Никель и алюминий ---
+  'OH|Ni':   { precipitate: true,   color: 0x4aa85a, formula: 'Ni(OH)2', name: 'гидроксид никеля (II)' },
+  'CO3|Ni':  { precipitate: true,   color: 0x6ab86a, formula: 'NiCO3',  name: 'карбонат никеля (II)' },
+  'PO4|Al':  { precipitate: true,   color: 0xf0f0ea, formula: 'AlPO4',  name: 'фосфат алюминия' },
 
   // --- Газ и нейтрализация (участвует H+) ---
   'CO3|H':  { gas: true, product: 'CO2', name: 'углекислый газ', bubbles: 0xffffff },

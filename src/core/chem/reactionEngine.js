@@ -82,7 +82,10 @@ function detectMedium(ions) {
   return 'neutral';
 }
 
-/** Реакция индикатора в зависимости от среды. */
+/**
+ * Реакция индикатора в зависимости от среды.
+ * form: 'paper' (лакмус) или 'solution' — разное поведение и отрисовка.
+ */
 function computeIndicator(id, ions) {
   const spec = INDICATORS[id];
   if (!spec) return null;
@@ -90,7 +93,14 @@ function computeIndicator(id, ions) {
   let color = null;
   if (medium === 'basic') color = spec.basicColor;
   else if (medium === 'acid') color = spec.acidColor;
-  return { indicator: true, name: spec.name, medium, color };
+  else color = spec.neutralColor ?? null;
+  return {
+    indicator: true,
+    form: spec.form ?? 'solution',
+    name: spec.name,
+    medium,
+    color,
+  };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { getLocationsByMode, getLocation, MODE_LABELS } from '../data/locations.js';
 import { createModeSwitch } from '../ui/modeSwitch.js';
+import { SHIFT_TASKS } from '../data/shiftTasks.js';
 
 /**
  * Карта локаций — сетка карточек с превью.
@@ -73,9 +74,18 @@ export function mapScreen(container, ctx) {
            ${loc.previewNpc ? `<img class="loc-preview-npc" src="${loc.previewNpc}" alt="">` : ''}
          </div>`;
 
+    // Прогресс по заданиям — только для локации с заданиями («Архив»)
+    let badge = '';
+    if (loc.screen === 'lab-shift') {
+      const done = ctx.game.solvedShiftTasks().length;
+      const total = SHIFT_TASKS.length;
+      badge = '<span class="loc-progress">' + done + ' / ' + total + '</span>';
+    }
+
     return `
       <button class="loc-card" data-location="${loc.id}">
         ${preview}
+        ${badge}
         <div class="loc-body">
           <h3 class="loc-title">${loc.title}</h3>
           <p class="loc-sub">${loc.subtitle}</p>

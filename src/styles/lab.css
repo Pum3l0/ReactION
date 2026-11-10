@@ -174,6 +174,26 @@
 
 .lab-task-actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
 
+/* Кнопка сворачивания щитка — только на телефоне (см. медиа) */
+.lab-task-collapse {
+  display: none;
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 50%;
+  background: var(--md-surface-container);
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  align-items: center;
+  justify-content: center;
+}
+.lab-task-collapse:hover { background: var(--md-surface-bright); color: var(--md-on-surface); }
+
 .lab-shelf {
   position: absolute;
   left: 50%;
@@ -312,45 +332,113 @@
   .lab-tip { max-width: 18rem; font-size: 0.8rem; }
 }
 
-/* Телефон / узкий экран */
+/* ==========================================================================
+   ТЕЛЕФОН. Принцип: 3D-стол — главное, все панели — сворачиваются,
+   ничего не висит постоянными баннерами поверх сцены.
+   ========================================================================== */
 @media (max-width: 760px) {
+  /* Щиток задания: компактный, можно свернуть */
   .lab-task {
-    width: min(17rem, 52vw);
-    top: 4.2rem;
-    right: 0.6rem;
-    padding: 0.85rem;
+    width: min(15rem, 58vw);
+    top: 3.6rem;
+    right: 0.5rem;
+    padding: 0.7rem;
+    border-radius: var(--md-shape-md);
   }
-  .lab-task-title { font-size: 0.98rem; margin-bottom: 0.35rem; }
-  .lab-task-brief { font-size: 0.82rem; }
-  .lab-task-portrait { width: 36px; height: 36px; }
-  .lab-task-status { font-size: 0.78rem; margin-top: 0.6rem; }
+  .lab-task-title { font-size: 0.9rem; margin-bottom: 0.3rem; }
+  .lab-task-brief { font-size: 0.78rem; line-height: 1.35; }
+  .lab-task-portrait { width: 32px; height: 32px; }
+  .lab-task-status { font-size: 0.72rem; margin-top: 0.5rem; }
+  .lab-task-actions { margin-top: 0.6rem; gap: 0.35rem; }
+  .lab-task-actions .btn { flex: 1; padding: 0.6rem 0.8rem; font-size: 0.82rem; }
 
-  .lab-shelf { gap: 0.35rem; padding: 0.5rem; bottom: 0.7rem; }
-  .lab-reagent { width: 4.1rem; padding: 0.4rem 0.2rem 0.45rem; }
-  .lab-reagent-vial { width: 22px; height: 32px; }
-  .lab-reagent-name { font-size: 0.72rem; }
-  .lab-reagent-sub { font-size: 0.58rem; }
+  /* Кнопка-свернуть для щитка (добавляется в разметке) */
+  .lab-task-collapse {
+    display: flex;
+  }
+  .lab-task.is-folded .lab-task-master,
+  .lab-task.is-folded .lab-task-brief,
+  .lab-task.is-folded .lab-task-status,
+  .lab-task.is-folded .lab-task-result,
+  .lab-task.is-folded .lab-task-actions {
+    display: none;
+  }
+  .lab-task.is-folded { width: auto; padding: 0.5rem 0.8rem; }
 
-  .lab-vessels {
-    right: 0.6rem;
-    bottom: 0.7rem;
+  /* Надпись реакции — снизу, чтобы не мешать столу сверху */
+  .lab-readout {
+    top: auto;
+    bottom: 5.2rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    transform: none;
+    max-width: none;
+    font-size: 0.85rem;
+  }
+
+  /* «В руке» — компактно вверху по центру */
+  .lab-hand {
+    top: 3.4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.45rem 0.85rem;
+    font-size: 0.78rem;
+  }
+  .lab-hand-text { font-size: 0.76rem; }
+
+  /* Панель реактивов — bottom-sheet снизу */
+  .lab-panel-host {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: auto;
+    max-height: 60vh;
+    align-items: flex-end;
+  }
+  .lab-panel-toggle {
+    margin: 0 0 4.5rem 0.6rem;
     flex-direction: row;
-    flex-wrap: wrap;
-    max-width: 40vw;
-    padding: 0.45rem;
+    padding: 0.55rem 0.9rem;
   }
-  .lab-vessel-btn { font-size: 0.72rem; padding: 0.4rem 0.6rem; }
+  .lab-panel-toggle-label { writing-mode: horizontal-tb; }
+  .lab-panel {
+    width: 100%;
+    max-height: 60vh;
+    margin: 0;
+    border-radius: var(--md-shape-lg) var(--md-shape-lg) 0 0;
+  }
+
+  /* Инструменты посуды — компактная строка над нижним краем */
+  .lab-vessels {
+    left: 0.5rem;
+    right: auto;
+    bottom: 0.5rem;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.35rem;
+    max-width: 60vw;
+  }
+  .lab-vessel-row { gap: 0.2rem; }
+  .lab-vessel-btn { font-size: 0.68rem; padding: 0.35rem 0.5rem; }
+  .lab-tool-btn { font-size: 0.75rem; padding: 0.35rem 0.45rem; }
 
   .lab-tip { display: none; }
+
+  /* Топбар компактнее */
+  .lab-topbar { padding: 0.6rem 0.6rem; }
+  .lab-topbar .btn { padding: 0.45rem 0.7rem; font-size: 0.78rem; }
 }
 
 /* Совсем низкий экран (альбомный телефон) */
-@media (max-height: 520px) {
-  .lab-task { top: 3.6rem; padding: 0.7rem; }
-  .lab-task-master { margin-bottom: 0.5rem; }
-  .lab-task-brief { font-size: 0.78rem; line-height: 1.35; }
-  .lab-task-actions { margin-top: 0.6rem; }
-  .lab-shelf { bottom: 0.5rem; padding: 0.4rem; }
+@media (max-height: 520px) and (max-width: 900px) {
+  .lab-task { top: 3rem; padding: 0.55rem; width: min(14rem, 46vw); }
+  .lab-task-master { margin-bottom: 0.35rem; }
+  .lab-task-brief { font-size: 0.72rem; line-height: 1.3; }
+  .lab-task-actions { margin-top: 0.45rem; }
+  .lab-readout { bottom: 4.4rem; font-size: 0.78rem; padding: 0.6rem 1rem; }
+  .lab-hand { top: 2.9rem; }
+  .lab-vessels { bottom: 0.35rem; }
 }
 
 /* ==========================================================================
@@ -646,11 +734,12 @@
 /* ==========================================================================
    Индикатор «в руке»
    ========================================================================== */
+/* Индикатор «в руке» — слева, под топбаром (над панелью «Реактивы»),
+   чтобы НЕ накладываться на надпись реакции по центру */
 .lab-hand {
   position: absolute;
-  top: 4.6rem;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 4.4rem;
+  left: 0.6rem;
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -659,14 +748,14 @@
   background: rgba(74, 64, 35, 0.95);
   border: 1px solid rgba(242, 208, 104, 0.5);
   box-shadow: var(--md-glow);
-  z-index: 7;
+  z-index: 8;
   animation: handIn 0.3s var(--md-ease-emphasized);
 }
 .lab-hand[hidden] { display: none; }
 
 @keyframes handIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .lab-hand-vial {
@@ -714,4 +803,216 @@
 @media (max-width: 760px) {
   .lab-panel { width: min(16rem, 80vw); }
   .lab-panel-host { top: 3.8rem; bottom: 6.5rem; }
+}
+
+/* ==========================================================================
+   Журнал опытов (панель справа)
+   ========================================================================== */
+.lab-journal {
+  position: absolute;
+  right: 1.4rem;
+  top: 5.2rem;
+  width: min(22rem, 38vw);
+  max-height: 62vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--md-shape-lg);
+  background: rgba(20, 26, 34, 0.95);
+  border: 1px solid var(--md-outline-variant);
+  box-shadow: var(--md-elevation-3);
+  backdrop-filter: blur(10px);
+  z-index: 7;
+}
+.lab-journal[hidden] { display: none; }
+
+.lab-journal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+.lab-journal-head h3 {
+  font-family: var(--font-headline);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--md-primary);
+  margin: 0;
+}
+
+.lab-journal-list {
+  overflow-y: auto;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.lab-journal-empty {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--md-on-surface-variant);
+  text-align: center;
+  padding: 1.2rem 0.6rem;
+  margin: 0;
+}
+
+.lab-journal-entry {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--md-shape-md);
+  background: var(--md-surface-container-low);
+  border-left: 3px solid var(--md-primary);
+}
+.lab-journal-num {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--md-on-surface-variant);
+  min-width: 1.4rem;
+}
+.lab-journal-body { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.lab-journal-eq {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--md-on-surface);
+  word-break: break-word;
+}
+.lab-journal-note {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  color: var(--md-on-surface-variant);
+}
+
+@media (max-width: 760px) {
+  .lab-journal {
+    left: 0.5rem; right: 0.5rem; top: 4rem; width: auto;
+    max-height: 55vh;
+  }
+}
+
+/* Бейдж прогресса на карточке локации с заданиями */
+.loc-card { position: relative; }
+.loc-progress {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--md-shape-full);
+  background: rgba(30, 37, 48, 0.92);
+  color: var(--md-primary);
+  border: 1px solid var(--md-primary);
+  z-index: 2;
+}
+
+/* Подсветка сосуда при перетаскивании реактива на него */
+.lab-vessel-row.is-target .lab-vessel-btn {
+  border-color: var(--md-primary);
+  background: var(--md-primary-container);
+  box-shadow: var(--md-glow);
+}
+
+/* Курсор-подсказка: сосуд можно тащить */
+.lab-vessel-btn { cursor: grab; }
+.lab-vessel-btn:active { cursor: grabbing; }
+
+/* ==========================================================================
+   Онбординг локаций
+   ========================================================================== */
+.onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.onboarding-spot {
+  position: fixed;
+  border-radius: var(--md-shape-md);
+  border: 2px solid var(--md-primary);
+  box-shadow: var(--md-glow), 0 0 0 9999px rgba(10, 14, 20, 0.72);
+  transition: all 0.35s var(--md-ease-standard);
+  pointer-events: none;
+}
+
+.onboarding-tip {
+  position: fixed;
+  width: 300px;
+  max-width: 82vw;
+  padding: 1rem 1.1rem;
+  border-radius: var(--md-shape-lg);
+  background: rgba(20, 26, 34, 0.98);
+  border: 1px solid var(--md-primary);
+  box-shadow: var(--md-elevation-3);
+  pointer-events: auto;
+  transition: left 0.35s var(--md-ease-standard), top 0.35s var(--md-ease-standard);
+}
+
+.onboarding-title {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--md-primary);
+  margin-bottom: 0.35rem;
+}
+
+.onboarding-text {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--md-on-surface);
+}
+
+.onboarding-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.onboarding-skip {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  background: transparent;
+  border: none;
+  color: var(--md-on-surface-variant);
+  cursor: pointer;
+  padding: 0.3rem;
+}
+.onboarding-skip:hover { color: var(--md-on-surface); }
+
+.onboarding-next { padding: 0.55rem 1.1rem; font-size: 0.85rem; }
+
+/* Иконка «бумажная полоска» (лакмус) и «горка порошка» в панели */
+.lab-item-paper {
+  width: 14px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--paper-color, #9a86c6) 100%, transparent) 0%,
+      color-mix(in srgb, var(--paper-color, #9a86c6) 70%, #f5f0e0) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+}
+
+.lab-item-powder {
+  width: 26px;
+  height: 34px;
+  flex-shrink: 0;
+  position: relative;
+}
+.lab-item-powder::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 4px;
+  height: 14px;
+  border-radius: 50% 50% 3px 3px / 100% 100% 3px 3px;
+  background: var(--powder-color, #cfcfcf);
+  box-shadow: inset 0 -3px 4px rgba(0, 0, 0, 0.3);
 }
