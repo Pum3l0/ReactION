@@ -356,24 +356,8 @@ export function labScreen(container, ctx) {
         duration: 0.8, ease: 'power2.inOut',
       });
 
-      if (r.reactions && r.reactions.length) {
-        // Показываем все термические реакции: что произошло и что выделилось
-        const lines = r.reactions.map((x) => {
-          const parts = ['🔥 ' + x.name];
-          if (x.gas && x.gas !== 'H2O') {
-            const g = x.gas === 'NH3' ? 'аммиак NH3'
-              : x.gas === 'CO2' ? 'углекислый газ CO2' : x.gas;
-            parts.push('↑ ' + g);
-          } else if (x.gas === 'H2O') {
-            parts.push('водяной пар');
-          }
-          return { kind: 'heat', text: parts.join(' · '), formula: x.equation ?? x.toFormula };
-        });
-        showReadout(lines);
-        setStatus(VESSEL_LABELS[vesselId] + ' на горелке: ' + r.reactions[0].name + '.');
-      } else {
-        setStatus(VESSEL_LABELS[vesselId] + ' на горелке. Нагревается…');
-      }
+      // Показываем реакцию — та же функция, что и при перетаскивании
+      announceHeat(vesselId, r.reactions);
     }
   }
 
@@ -682,13 +666,42 @@ export function labScreen(container, ctx) {
       });
       if (!vessel.onBurner) {
         const r = state.startHeating(vessel.id);
-        if (r.ok) { vessel.onBurner = true; setStatus(VESSEL_LABELS[vessel.id] + ' на горелке.'); }
+        if (r.ok) {
+          vessel.onBurner = true;
+          // Показываем надпись и реакцию — как при кнопке 🔥, а не только статус
+          announceHeat(vessel.id, r.reactions);
+        }
       }
     } else {
       returnHome(vessel);
     }
     drag = null;
     downAt = null;
+  }
+
+  /**
+   * Единый показ результата нагрева: и при кнопке 🔥, и при перетаскивании
+   * сосуда на горелку. Выводит уравнение и что выделилось (газ/пар).
+   */
+  function announceHeat(vesselId, reactions) {
+    const label = VESSEL_LABELS[vesselId] ?? 'Сосуд';
+    if (reactions && reactions.length) {
+      const lines = reactions.map((x) => {
+        const parts = ['🔥 ' + x.name];
+        if (x.gas && x.gas !== 'H2O') {
+          const g = x.gas === 'NH3' ? 'аммиак NH3'
+            : x.gas === 'CO2' ? 'углекислый газ CO2' : x.gas;
+          parts.push('↑ ' + g);
+        } else if (x.gas === 'H2O') {
+          parts.push('водяной пар');
+        }
+        return { kind: 'heat', text: parts.join(' · '), formula: x.equation ?? x.toFormula };
+      });
+      showReadout(lines);
+      setStatus(label + ' на горелке: ' + reactions[0].name + '.');
+    } else {
+      setStatus(label + ' на горелке. Нагревается…');
+    }
   }
 
   /** Вернуть сосуд на родное место (если он не на горелке). */
