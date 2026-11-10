@@ -222,7 +222,8 @@ export function updateLiquidGeometry(liquid, level) {
   pts.push(new THREE.Vector2(0.001, top)); // крышка сверху, чтобы не было полого
 
   const geo = new THREE.LatheGeometry(pts, 28);
-  liquid.geometry.dispose();
+  // Старую геометрию освобождаем, если она есть (первый вызов — geometry пустая)
+  if (liquid.geometry && liquid.geometry !== geo) liquid.geometry.dispose();
   liquid.geometry = geo;
   liquid.visible = true;
 }

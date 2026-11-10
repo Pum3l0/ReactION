@@ -1,4 +1,5 @@
 import { computeMixture, checkShiftGoal } from './reactionEngine.js';
+import { REAGENTS } from '../../data/reactions.js';
 import {
   tintLiquid,
   setLiquidLevel,
@@ -134,6 +135,54 @@ export class LabState {
       this.gasSprites.delete(vessel.id);
     });
     this.gasSprites.set(vessel.id, tick);
+  }
+
+  /**
+   * Фильтрование: отделяем осадок от жидкости.
+   * В сосуде остаётся прозрачный раствор, осадок уходит на фильтр.
+   */
+  filter(vesselId) {
+    const vessel = this.lab.getVessel(vesselId);
+    if (!vessel || vessel.isEmpty) return { ok: false, reason: 'Сосуд пуст' };
+
+    const result = computeMixture(vessel.reagentIds);
+    const precip = result.reactions.find((r) => r.precipitate && r.formula);
+    if (!precip) return { ok: false, reason: 'В сосуде нет осадка для фильтрования' };
+
+    // Осадок уходит на фильтр: убираем его визуально и осветляем раствор.
+    clearPrecipitate(vessel.group);
+    // Фильтрат — цвета оставшихся растворённых ионов (обычно бесцветный).
+    const dissolved = vessel.contents
+      .map((c) => REAGENTS[c.id])
+      .find((r) => r?.color && !r.tags?.includes('metal'));
+    tintLiquid(vessel.liquid, dissolved?.color ?? 0xe8f2ff);
+
+    vessel.filtrate = precip.formula;
+    return { ok: true, precipitate: precip.name ?? precip.formula };
+  }
+
+  /**
+   * Магнит: вытягиваем железную стружку (или другой ферромагнитный металл)
+   * из содержимого сосуда.
+   */
+  magnet(vesselId) {
+    const vessel = this.lab.getVessel(vesselId);
+    if (!vessel || vessel.isEmpty) return { ok: false, reason: 'Сосуд пуст' };
+
+    const before = vessel.contents.length;
+    const metalIds = ['fe', 'zn'];
+    const hadMetal = vessel.contents.some((c) => metalIds.includes(c.id));
+    vessel.contents = vessel.contents.filter((c) => !metalIds.includes(c.id));
+    if (!hadMetal) return { ok: false, reason: 'Магниту тут нечего притягивать' };
+
+    const removed = before - vessel.contents.length;
+    // Пересчитываем состояние после извлечения металла
+    if (vessel.contents.length) {
+      this._refresh(vessel);
+    } else {
+      this.empty(vesselId);
+    }
+    return { ok: true, removed: removed * 6 };
   }
 
   update(dt, elapsed) {
