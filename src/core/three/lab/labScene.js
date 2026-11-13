@@ -68,11 +68,12 @@ export class LabVessel {
   }
 
   add(reagent, amount) {
+    if (!Number.isFinite(amount) || amount <= 0) return 0;
     const free = this.capacity - this.volume;
     const take = Math.max(0, Math.min(amount, free));
     if (take <= 0) return 0;
     // Сливаем одинаковые реагенты в одну запись
-    const existing = this.contents.find((c) => c.id === reagent.id);
+    const existing = this.contents.find((c) => c.id === reagent.id && !c.ions && !c.processed);
     if (existing) existing.amount += take;
     else this.contents.push({ id: reagent.id, amount: take, phase: reagent.phase ?? 'liquid' });
     return take;

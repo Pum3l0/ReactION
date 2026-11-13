@@ -137,7 +137,7 @@ export function orbitalScreen(container, ctx) {
       const outer = 4 + atom.shells.length * 1.45;
       const finalZ = outer * 2.4;
       const targetZ =
-        (13 + atom.activeIndex * 0.5 + finalLook * (finalZ - 13)) * zoomBoost;
+        (13 + atom.activeIndex * 0.5 + finalLook * (finalZ - 13)) * zoomBoost * Math.max(1, 1 / cam.aspect);
 
       const lookX = -1.5 + finalLook * 2.4;
       const lookY = 0;

@@ -105,7 +105,7 @@ export const REAGENTS = {
   litmus:          { formula: 'лакмус',   name: 'лакмус (бумага)', color: 0x9a86c6, state: 'solid',  tags: ['indicator'], form: 'paper',    ions: [] },
   methylorange:    { formula: 'мет.оранж', name: 'метилоранж',  color: 0xf2c14e, state: 'liquid', tags: ['indicator'], form: 'solution', ions: [] },
 
-  // --- Металлы (для будущей механики вытеснения) ---
+  // --- Металлы: магнитное разделение; вытеснение пока не моделируется ---
   zn:     { formula: 'Zn',     name: 'цинк (гранулы)',       color: 0x8b939c, state: 'solid',  tags: ['metal'], ions: ['Zn'] },
   fe:     { formula: 'Fe',     name: 'железо (стружка)',     color: 0x6b6b6b, state: 'solid',  tags: ['metal'], ions: ['Fe2'] },
 };
@@ -169,7 +169,7 @@ export const SOLUBILITY = {
   'SO4|Ca':  { precipitate: 'weak', color: 0xf0f0ea, formula: 'CaSO4', name: 'сульфат кальция' },
 
   // --- Карбонаты (строка CO3) ---
-  'CO3|Cu':  { precipitate: true, color: 0x3f9ea8, formula: 'CuCO3', name: 'карбонат меди (II)' },
+  'CO3|Cu':  { precipitate: true, color: 0x3f9ea8, formula: 'Cu2(OH)2CO3', name: 'основной карбонат меди (II)' },
   'CO3|Ba':  { precipitate: true, color: 0xf2f2ee, formula: 'BaCO3', name: 'карбонат бария' },
   'CO3|Ca':  { precipitate: true, color: 0xf0f0ea, formula: 'CaCO3', name: 'карбонат кальция' },
   'CO3|Mg':  { precipitate: true, color: 0xf2f2ee, formula: 'MgCO3', name: 'карбонат магния' },
@@ -192,12 +192,6 @@ export const SOLUBILITY = {
   'S|Zn':  { precipitate: true, color: 0xf2f2ee, formula: 'ZnS', name: 'сульфид цинка' },
   'S|Pb':  { precipitate: true, color: 0x2a2a2a, formula: 'PbS', name: 'сульфид свинца (II)' },
   'S|Fe2': { precipitate: true, color: 0x2a2a2a, formula: 'FeS', name: 'сульфид железа (II)' },
-
-  // --- Растворение оксидов в кислоте (оксид + H+ -> соль + вода) ---
-  // Считаем нейтрализацией: виден только факт растворения, без осадка.
-  'Cu|H':    { neutral: true, formula: 'CuSO4/Cl2', name: 'оксид меди растворяется в кислоте' },
-  'Fe3|H':   { neutral: true, formula: 'FeCl3/SO4',  name: 'оксид железа растворяется в кислоте' },
-  'Ca|H':    { neutral: true, formula: 'CaCl2',      name: 'оксид/карбонат кальция реагирует с кислотой' },
 
   // --- Никель и алюминий ---
   'OH|Ni':   { precipitate: true,   color: 0x4aa85a, formula: 'Ni(OH)2', name: 'гидроксид никеля (II)' },
@@ -241,7 +235,7 @@ export const THERMAL = {
 
   // --- Карбонаты -> оксиды + CO2 ---
   'CO3|Ca':  { decomposes: true, gas: 'CO2', color: 0xf0efe8, toFormula: 'CaO', name: 'карбонат кальция разлагается', equation: 'CaCO3 --t--> CaO + CO2 (газ)' },
-  'CO3|Cu':  { decomposes: true, gas: 'CO2', color: 0x1c1c1c, toFormula: 'CuO', name: 'карбонат меди (II) разлагается', equation: 'CuCO3 --t--> CuO + CO2 (газ)' },
+  'CO3|Cu':  { decomposes: true, gas: 'CO2', color: 0x1c1c1c, toFormula: 'CuO', name: 'карбонат меди (II) разлагается', equation: 'Cu2(OH)2CO3 --t--> 2CuO + CO2 (газ) + H2O' },
   'CO3|Mg':  { decomposes: true, gas: 'CO2', color: 0xf2f2ee, toFormula: 'MgO', name: 'карбонат магния разлагается', equation: 'MgCO3 --t--> MgO + CO2 (газ)' },
   'CO3|Zn':  { decomposes: true, gas: 'CO2', color: 0xf2f2ee, toFormula: 'ZnO', name: 'карбонат цинка разлагается', equation: 'ZnCO3 --t--> ZnO + CO2 (газ)' },
   'CO3|Ba':  { decomposes: true, gas: 'CO2', color: 0xf2f2ee, toFormula: 'BaO', name: 'карбонат бария разлагается', equation: 'BaCO3 --t--> BaO + CO2 (газ)' },
@@ -252,11 +246,10 @@ export const THERMAL = {
  * Например, аммиачная вода при нагреве выделяет газ NH3.
  */
 export const THERMAL_REAGENT = {
-  nh3:    { color: null, gas: 'NH3', toFormula: 'NH3', name: 'аммиак выделяется при нагреве', equation: 'NH4OH --t--> NH3 (газ) + H2O' },
-  caoh2:  { color: 0xf0efe8, gas: 'H2O', toFormula: 'CaO', name: 'гидроксид кальция разлагается', equation: 'Ca(OH)2 --t--> CaO + H2O' },
+  nh3:    { color: null, gas: 'NH3', toFormula: 'NH3', name: 'аммиак выделяется при нагреве', equation: 'NH3 (водн.) --t--> NH3 (газ)' },
+  caoh2:  { decomposes: true, color: 0xf0efe8, gas: 'H2O', toFormula: 'CaO', name: 'гидроксид кальция разлагается', equation: 'Ca(OH)2 --t--> CaO + H2O' },
   caco3:  { decomposes: true, gas: 'CO2', color: 0xf0efe8, toFormula: 'CaO', name: 'карбонат кальция разлагается', equation: 'CaCO3 --t--> CaO + CO2 (газ)' },
   kmno4:  { decomposes: true, gas: 'O2', color: 0x2a2a2a, toFormula: 'K2MnO4 + MnO2', name: 'перманганат калия разлагается', equation: '2KMnO4 --t--> K2MnO4 + MnO2 + O2 (газ)' },
-  cuo:    { color: 0x6b2a10, toFormula: 'Cu2O', name: 'оксид меди (II) частично восстанавливается', equation: '4CuO --t--> 2Cu2O + O2' },
 };
 
 /**

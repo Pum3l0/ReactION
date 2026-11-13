@@ -1,6 +1,6 @@
 import {
   REAGENTS, SOLUBILITY, INDICATORS,
-  THERMAL, THERMAL_REAGENT, THERMAL_PRIORITY,
+  THERMAL, THERMAL_REAGENT,
 } from '../../data/reactions.js';
 
 /**
@@ -30,64 +30,84 @@ function isReal(rule) {
  * Смешать содержимое сосуда и посчитать результат.
  * @param {string[]} reagentIds — id реагентов в сосуде (в порядке добавления)
  */
-export function computeMixture(reagentIds) {
-  const ions = collectIons(reagentIds);
-  const reactions = [];
+// Contents may carry an ion override after a separation operation. Amounts are
+// capacity units, not moles: this engine deliberately makes qualitative claims.
+function entries(input) {
+  return input.map((c) => typeof c === 'string' ? { id: c } : c)
+    .filter((c) => REAGENTS[c.id] && (c.amount === undefined || c.amount > 0));
+}
 
-  // Парный перебор ионов. Ионов единицы — перебор дешёвый.
-  for (let i = 0; i < ions.length; i++) {
-    for (let j = i + 1; j < ions.length; j++) {
-      const rule = lookup(ions[i], ions[j]);
-      if (isReal(rule)) reactions.push({ ...rule, pair: [ions[i], ions[j]] });
+export function computeMixture(input) {
+  const contents = entries(input);
+  const reagentIds = [...new Set(contents.map((c) => c.id))];
+  const aqueous = contents.some((c) => REAGENTS[c.id].state === 'liquid');
+  const ions = aqueous ? collectIons(contents) : [];
+  const reactions = [];
+  // A rule requires ions from different reagents, not the two ions of a
+  // single reagent (limewater, chalk, etc.). Deduplicate repeated additions.
+  for (let i = 0; i < contents.length; i++) {
+    for (let j = i + 1; j < contents.length; j++) {
+      if (contents[i].id === contents[j].id || !aqueous) continue;
+      for (const a of availableIons(contents[i])) {
+        for (const b of availableIons(contents[j])) {
+          const rule = lookup(a, b);
+          // Competing acid/base conditions need concentrations; do not assert
+          // a hydroxide/carbonate/phosphate precipitate in that mixture.
+          const uncertain = rule?.precipitate && ions.includes('H') && ['OH', 'CO3', 'PO4', 'SiO3'].some((ion) => a === ion || b === ion);
+          if (!uncertain && isReal(rule) && !reactions.some((r) => r.pair?.includes(a) && r.pair?.includes(b))) {
+            reactions.push({ ...rule, pair: [a, b] });
+          }
+        }
+      }
     }
   }
-
-  // Индикаторы зависят не от пары ионов, а от среды раствора
-  const indicators = reagentIds.filter((id) => INDICATORS[id]);
-  for (const id of indicators) {
-    const r = computeIndicator(id, ions);
-    if (r) reactions.push(r);
+  if (reactions.some((r) => r.formula === 'Cu2(OH)2CO3')) {
+    reactions.push({ gas: true, product: 'CO2', name: 'углекислый газ', bubbles: 0xffffff });
   }
-
+  // Insoluble chalk and oxides react as substances, not as free cations.
+  if (ions.includes('H')) {
+    if (contents.some((c) => c.id === 'caco3' && !c.processed)) {
+      reactions.push({ gas: true, product: 'CO2', name: 'углекислый газ', bubbles: 0xffffff });
+    }
+    for (const id of ['cuo', 'fe2o3', 'cao']) {
+      if (contents.some((c) => c.id === id && !c.processed)) {
+        reactions.push({ neutral: true, name: REAGENTS[id].name + ' реагирует с кислотой' });
+      }
+    }
+  }
   const medium = detectMedium(ions);
-
+  for (const id of reagentIds.filter((id) => INDICATORS[id])) {
+    if (aqueous) reactions.push(computeIndicator(id, ions));
+  }
   return {
-    reactions,
-    medium,
-    solutionColor: resolveSolutionColor(reagentIds, reactions, medium),
+    reactions, medium, aqueous, reagentIds,
+    solutionColor: aqueous ? resolveSolutionColor(reagentIds.filter((id) => {
+      const r = REAGENTS[id];
+      if (!r.color || r.tags.includes('indicator')) return true;
+      return contents.some((c) => c.id === id && availableIons(c).some((ion) => !['SO4', 'Cl', 'NO3'].includes(ion)));
+    }), reactions, medium) : null,
     hasPrecipitate: reactions.some((r) => r.precipitate),
     hasGas: reactions.some((r) => r.gas),
   };
 }
 
-/**
- * Реакции, которые идут ТОЛЬКО при нагреве (термическое разложение).
- * @param {string[]} reagentIds — что сейчас в сосуде
- * @returns {{reactions: object[], changed: boolean}}
- */
-export function computeHeated(reagentIds) {
-  const ions = collectIons(reagentIds);
+export function computeHeated(input) {
+  const contents = entries(input);
+  const mixture = computeMixture(contents);
   const found = [];
-
-  // 1. По парам ионов (смеси: Cu+OH, Ca+CO3 и т.п.)
-  for (let i = 0; i < ions.length; i++) {
-    for (let j = i + 1; j < ions.length; j++) {
-      const rule = THERMAL[ions[i] + '|' + ions[j]] ?? THERMAL[ions[j] + '|' + ions[i]];
-      if (rule) found.push({ ...rule, thermal: true, pair: [ions[i], ions[j]] });
-    }
+  // Heat existing precipitates, never hypothetical pairs of unreacted ions.
+  for (const precipitate of mixture.reactions.filter((r) => r.precipitate)) {
+    const [a, b] = precipitate.pair;
+    const rule = THERMAL[a + '|' + b] ?? THERMAL[b + '|' + a];
+    if (rule) found.push({ ...rule, thermal: true, pair: [a, b] });
   }
-
-  // 2. По отдельным реагентам (аммиак, гашёная известь и т.п.)
-  for (const id of reagentIds) {
-    const rule = THERMAL_REAGENT[id];
-    if (rule) found.push({ ...rule, thermal: true, reagentId: id });
+  for (const c of contents) {
+    const rule = THERMAL_REAGENT[c.id];
+    if (rule && !c.processed) found.push({ ...rule, thermal: true, reagentId: c.id });
   }
-
-  // Приоритет: разложение осадка важнее смены цвета. Берём самое наглядное.
   found.sort((a, b) => priority(b) - priority(a));
   const reactions = found.slice(0, 1);
-
-  return { reactions, changed: reactions.length > 0 };
+  return { reactions, reagentIds: mixture.reagentIds, changed: reactions.length > 0 };
 }
 
 /** Вес наглядности термической реакции. */
@@ -99,13 +119,16 @@ function priority(r) {
 }
 
 /** Плоский список ионов из всех налитых реагентов. */
-export function collectIons(reagentIds) {
-  const out = [];
-  for (const id of reagentIds) {
-    const reagent = REAGENTS[id];
-    if (reagent) out.push(...reagent.ions);
-  }
-  return out;
+function availableIons(c) {
+  const r = REAGENTS[c.id];
+  // Metals and insoluble oxides are not dissolved metal cations. Their
+  // reactions require separate reagent-specific rules, outside this model.
+  if (!r || r.tags.includes('metal') || r.tags.includes('oxide') || c.id === 'caco3') return [];
+  return c.ions ?? r.ions;
+}
+
+export function collectIons(input) {
+  return [...new Set(entries(input).flatMap(availableIons))];
 }
 
 /** Найти правило для пары ионов. Порядок в ключе не важен. */
@@ -119,7 +142,7 @@ function detectMedium(ions) {
   const hasH = ions.includes('H');
   if (hasOH && !hasH) return 'basic';
   if (hasH && !hasOH) return 'acid';
-  if (hasOH && hasH) return 'neutral'; // нейтрализовались
+  if (hasOH && hasH) return 'unknown'; // No concentrations: do not claim equivalence.
   return 'neutral';
 }
 
@@ -134,7 +157,7 @@ function computeIndicator(id, ions) {
   let color = null;
   if (medium === 'basic') color = spec.basicColor;
   else if (medium === 'acid') color = spec.acidColor;
-  else color = spec.neutralColor ?? null;
+  else if (medium === 'neutral') color = spec.neutralColor ?? null;
   return {
     indicator: true,
     form: spec.form ?? 'solution',
@@ -149,7 +172,8 @@ function computeIndicator(id, ions) {
  * Приоритет: индикатор -> осадок -> цвет исходного реагента.
  */
 function resolveSolutionColor(reagentIds, reactions, medium) {
-  const indicator = reactions.find((r) => r.indicator && r.color);
+  if (medium === 'unknown' && reagentIds.some((id) => INDICATORS[id])) return null;
+  const indicator = reactions.find((r) => r.indicator && r.form === 'solution' && r.color);
   if (indicator) return indicator.color;
 
   const precip = reactions.find((r) => r.precipitate && r.color);
@@ -159,7 +183,7 @@ function resolveSolutionColor(reagentIds, reactions, medium) {
   let last = null;
   for (const id of reagentIds) {
     const reagent = REAGENTS[id];
-    if (reagent?.color) last = reagent.color;
+    if (reagent?.color && !reagent.tags.includes('metal') && !reagent.tags.includes('oxide') && id !== 'litmus') last = reagent.color;
   }
   if (last) return last;
   void medium;
@@ -199,14 +223,14 @@ export function describeResult(result, reagentIds) {
     } else if (r.gas) {
       lines.push({ kind: 'gas', text: r.name + ' — газ', formula: r.product });
     } else if (r.neutral) {
-      lines.push({ kind: 'neutral', text: 'нейтрализация, образовалась вода' });
-    } else if (r.indicator && r.color) {
-      lines.push({ kind: 'indicator', text: r.name + ': ' + (r.medium === 'basic' ? 'щелочная среда' : 'кислая среда') });
+      lines.push({ kind: 'neutral', text: r.name });
+    } else if (r.indicator) {
+      lines.push({ kind: 'indicator', text: r.name + ': ' + ({ basic: 'щелочная среда', acid: 'кислая среда', neutral: 'нейтральная среда' }[r.medium] ?? 'среда не определена') });
     }
   }
 
   if (!lines.length && formulas.length) {
-    lines.push({ kind: 'none', text: 'Заметной реакции нет — вещества просто смешались.' });
+    lines.push({ kind: 'none', text: 'Для этих веществ и условий результат моделью не определён. Это не означает отсутствия реакции в действительности.' });
   }
 
   return lines;
@@ -218,7 +242,10 @@ export function describeResult(result, reagentIds) {
 export function checkShiftGoal(task, result) {
   if (!task) return { ok: null, reason: 'Заданий нет.' };
   const goal = task.goal;
-  const rs = result.reactions;
+  const rs = result.reactions ?? [];
+  if (task.reagents.some((id) => !result.reagentIds?.includes(id))) {
+    return { ok: false, reason: 'Собери все реагенты задания в одном сосуде.' };
+  }
 
   switch (goal.kind) {
     case 'precipitate': {
@@ -252,11 +279,11 @@ export function checkShiftGoal(task, result) {
         (r) => r.thermal && r.toFormula === goal.product,
       );
       return hit
-        ? { ok: true, reason: 'Вещество разложилось при нагреве — верно.' }
+        ? { ok: true, reason: 'Получен ожидаемый результат нагрева.' }
         : { ok: false, reason: 'При нагреве нужного превращения не произошло.' };
     }
     case 'color': {
-      const ok = result.solutionColor === goal.color;
+      const ok = result.aqueous && result.solutionColor === goal.color;
       return ok
         ? { ok: true, reason: 'Раствор получился нужного цвета.' }
         : { ok: false, reason: 'Цвет раствора другой. Проверь реагенты.' };

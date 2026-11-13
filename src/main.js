@@ -78,8 +78,7 @@ renderer.onUpdate((_dt, elapsed) => {
   lighting.key.intensity = 55 + Math.sin(elapsed * 1.4) * 5;
 });
 
-// Следим за устройством и ориентацией: на телефоне в портрете показываем
-// экран «поверни горизонтально», а 3D-сценам сообщаем о повороте.
+// Следим за доступной высотой и ориентацией без блокировки портретного режима.
 const deviceWatcher = initDeviceWatcher({
   onChange: ({ device, orientation }) => {
     ctx.events.emit('device:changed', { device, orientation });

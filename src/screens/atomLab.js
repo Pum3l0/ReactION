@@ -107,7 +107,8 @@ export function atomLabScreen(container, ctx) {
       // Камера подстраивается под РАЗМЕР атома: чем больше слоёв,
       // тем дальше отъезжаем, чтобы всё было видно целиком.
       const outer = 3.5 + (atom.shells.length || 1) * 1.9;
-      const targetZ = outer * (confirmed ? 2.4 : 2.1);
+      const aspectFit = Math.max(1, 1 / cam.aspect);
+      const targetZ = outer * (confirmed ? 2.4 : 2.1) * aspectFit;
       cam.position.z += (targetZ - cam.position.z) * Math.min(dt * 1.8, 1);
       cam.position.y += (0.5 - cam.position.y) * Math.min(dt * 1.8, 1);
       cam.lookAt(0, 0, 0);

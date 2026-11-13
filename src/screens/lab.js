@@ -143,8 +143,30 @@ export function labScreen(container, ctx) {
   };
 
   // На телефоне играем через крупные кнопки вместо точного 3D-клика
-  const mobile = isPhone() || window.matchMedia('(max-width: 760px)').matches;
-  if (mobile) container.classList.add('is-mobile');
+  let mobile = false;
+  function fitViewport() {
+    const wasMobile = mobile;
+    mobile = isPhone() || window.matchMedia('(max-width: 1024px) and (pointer: coarse)').matches;
+    container.classList.toggle('is-mobile', mobile);
+    if (mobile && !wasMobile) {
+      els.task.classList.add('is-folded');
+      const button = els.task.querySelector('[data-action="fold-task"]');
+      button.textContent = '+';
+      button.setAttribute('aria-expanded', 'false');
+      button.setAttribute('aria-label', 'Развернуть задание');
+    }
+    if (!lab || !container.classList.contains('is-active')) return;
+    const height = window.visualViewport?.height ?? window.innerHeight;
+    const aspect = window.innerWidth / height;
+    const scale = Math.max(1, 1.4 / aspect);
+    ctx.renderer.camera.position.set(0, 1.2 + 2.8 * scale, 0.4 + 10.1 * scale);
+    ctx.renderer.scene.fog = new THREE.Fog(0x141a22, 11 * scale, 28 * scale);
+    ctx.renderer.setLookTarget(0, 1.2, 0.4);
+    ctx.renderer.setParallax(!mobile);
+  }
+  fitViewport();
+  window.addEventListener('resize', fitViewport);
+  window.visualViewport?.addEventListener('resize', fitViewport);
 
   /** Крупный выбор сосуда, куда налить (мобильный режим). */
   function openPourPicker(reagentId) {
@@ -184,7 +206,7 @@ export function labScreen(container, ctx) {
       return '<div class="lab-journal-entry">' +
         '<span class="lab-journal-num">' + (log.length - i) + '</span>' +
         '<div class="lab-journal-body">' +
-          '<span class="lab-journal-eq">' + left + ' \u2192 ' + right + '</span>' +
+          '<span class="lab-journal-eq">' + left + ' · наблюдение: ' + right + '</span>' +
           '<span class="lab-journal-note">' + note + '</span>' +
         '</div>' +
       '</div>';
@@ -203,6 +225,7 @@ export function labScreen(container, ctx) {
       reagentIds: currentReagentIds(),
       onPick: (id) => pickReagent(id),
     });
+    if (mobile) panel.collapse();
   }
 
   // ==================================================================
@@ -215,10 +238,12 @@ export function labScreen(container, ctx) {
     // должны целиком попадать в кадр, включая фильтр и магнит на столе.
     ctx.renderer.camera.position.set(0, 4.0, 10.5);
     ctx.renderer.setLookTarget(0, 1.2, 0.4);
-    ctx.renderer.setParallax(true);
+    ctx.renderer.setParallax(!mobile);
 
     lab = buildLab(ctx.renderer.scene);
     state = new LabState(lab, task);
+    // The screen becomes active after its factory returns.
+    requestAnimationFrame(fitViewport);
     // 3D-склянки на полке: в полигоне их много — ставим все
     reagents = placeReagents(ctx.renderer.scene, lab.root, currentReagentIds());
 
@@ -227,6 +252,8 @@ export function labScreen(container, ctx) {
   }
 
   function teardownScene() {
+    drag = null; panelDrag = null; downAt = null;
+    document.body.style.cursor = '';
     stopUpdate?.(); stopUpdate = null;
     state?.reset();
     reagents?.dispose();
@@ -366,7 +393,7 @@ export function labScreen(container, ctx) {
     if (!state) return;
     const res = state.filter(vesselId);
     if (!res.ok) { setStatus(res.reason, 'fail'); return; }
-    setStatus('Осадок ' + (res.precipitate ?? '') + ' отделён на фильтре. Чистый раствор — в колбе.');
+    setStatus('Осадок ' + (res.precipitate ?? '') + ' отделён на фильтре. Фильтрат остался в выбранном сосуде.');
     showReadout([{ kind: 'neutral', text: '⧗ Осадок ' + (res.precipitate ?? '') + ' отделён фильтрованием' }]);
   }
 
@@ -375,7 +402,7 @@ export function labScreen(container, ctx) {
     if (!state) return;
     const res = state.magnet(vesselId);
     if (!res.ok) { setStatus(res.reason, 'fail'); return; }
-    setStatus('🧲 Железо ' + (res.removed ?? '') + ' мг притянуто магнитом.');
+    setStatus('🧲 Железная стружка отделена магнитом.');
     showReadout([{ kind: 'neutral', text: '🧲 Железная стружка отделена магнитом' }]);
   }
 
@@ -396,7 +423,7 @@ export function labScreen(container, ctx) {
     const vd = lab.vessels.find((v) => v.id === vesselId);
     if (!vd || !vd.contents.length) { els.readout.hidden = true; return; }
     const ids = vd.contents.map((c) => c.id);
-    const result = state.lastResult;
+    const result = vd.result;
     if (!result) return;
     const header = ids.map((id) => REAGENTS[id]?.formula ?? id).join(' + ');
     showReadout([{ kind: 'mix', text: header }].concat(describeResult(result, ids)));
@@ -435,8 +462,9 @@ export function labScreen(container, ctx) {
   let downAt = null;  // { x, y } — где нажали (отличить клик от drag)
 
   function pickVesselAt(event) {
-    pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-    pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    const rect = ctx.renderer.canvas.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, ctx.renderer.camera);
     const hits = raycaster.intersectObjects(lab.vessels.map((v) => v.group), true);
     if (!hits.length) return null;
@@ -447,8 +475,9 @@ export function labScreen(container, ctx) {
 
   /** Точка пересечения луча с плоскостью стола. */
   function planePoint(event, out) {
-    pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-    pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    const rect = ctx.renderer.canvas.getBoundingClientRect();
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointer, ctx.renderer.camera);
     return raycaster.ray.intersectPlane(dragPlane, out);
   }
@@ -465,7 +494,7 @@ export function labScreen(container, ctx) {
       p.y += 0.6;
       p.project(ctx.renderer.camera);
       const sx = (p.x * 0.5 + 0.5) * window.innerWidth;
-      const sy = (-p.y * 0.5 + 0.5) * window.innerHeight;
+      const sy = (-p.y * 0.5 + 0.5) * ctx.renderer.canvas.getBoundingClientRect().height;
       const d = Math.hypot(sx - event.clientX, sy - event.clientY);
       if (d < bestDist) { bestDist = d; best = vessel; }
     }
@@ -473,13 +502,15 @@ export function labScreen(container, ctx) {
   }
 
   function onPointerDown(event) {
-    if (!state) return;
+    if (!state || !container.classList.contains('is-active') || !event.isPrimary || event.button !== 0) return;
     // Клик по интерфейсу — не наша забота
-    if (event.target.closest('.lab-topbar, .lab-task, .lab-vessels, .lab-tip, .window, .lab-pour-picker')) return;
+    if (event.target.closest('.lab-topbar, .lab-task, .lab-vessels, .lab-tip, .window, .lab-pour-picker, .lab-journal, .lab-hand, .lab-readout, .onboarding, .lab-panel-toggle')) return;
 
     // Начало drag реактива из панели
     const item = event.target.closest('.lab-item[data-id]');
     if (item) {
+      // Touch scroll must not select a reagent. ReagentPanel handles taps.
+      if (event.pointerType === 'touch') return;
       const id = item.dataset.id;
       pickReagent(id);
       panelDrag = { reagentId: picked, started: false };
@@ -508,6 +539,7 @@ export function labScreen(container, ctx) {
       0,
       vessel.group.position.z - dragPoint.z,
     );
+    ctx.renderer.canvas.setPointerCapture(event.pointerId);
     document.body.style.cursor = 'grabbing';
   }
 
@@ -601,6 +633,17 @@ export function labScreen(container, ctx) {
   }
 
   function onPointerUp(event) {
+    if (ctx.renderer.canvas.hasPointerCapture(event.pointerId)) ctx.renderer.canvas.releasePointerCapture(event.pointerId);
+    if (event.type === 'pointercancel') {
+      if (drag && lab) {
+        drag.vessel.group.position.copy(drag.homePos);
+        lab.vessels.forEach((v) => highlightVessel(v, false));
+        highlightBurner(false);
+      }
+      panelDrag = null; drag = null; downAt = null;
+      document.body.style.cursor = '';
+      return;
+    }
     // Окончание drag реактива из панели
     if (panelDrag && downAt) {
       const wasDrag = panelDrag.started;
@@ -771,7 +814,11 @@ export function labScreen(container, ctx) {
     if (event.target.closest('[data-action="fold-task"]')) {
       const folded = els.task.classList.toggle('is-folded');
       const btn = els.task.querySelector('[data-action="fold-task"]');
-      if (btn) btn.textContent = folded ? '+' : '–';
+      if (btn) {
+        btn.textContent = folded ? '+' : '–';
+        btn.setAttribute('aria-expanded', String(!folded));
+        btn.setAttribute('aria-label', folded ? 'Развернуть задание' : 'Свернуть задание');
+      }
       return;
     }
     if (event.target.closest('[data-action="check"]')) { check(); return; }
@@ -833,6 +880,8 @@ export function labScreen(container, ctx) {
       ctx.renderer.setParallax(true);
     },
     dispose() {
+      window.removeEventListener('resize', fitViewport);
+      window.visualViewport?.removeEventListener('resize', fitViewport);
       container.removeEventListener('click', onClick);
       window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);

@@ -183,6 +183,6 @@ export class ReagentPanel {
   destroy() {
     this.host.removeEventListener('click', this._onClick);
     this.searchEl?.removeEventListener('input', this._onInput);
-    this.host.innerHTML = '';
+    this.host.remove();
   }
 }

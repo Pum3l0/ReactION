@@ -26,7 +26,8 @@ export class Renderer {
       alpha: false,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const touchScreen = window.matchMedia('(pointer: coarse)').matches;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, touchScreen ? 1.25 : 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
@@ -63,6 +64,7 @@ export class Renderer {
     this._onResize = this._onResize.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
     window.addEventListener('resize', this._onResize);
+    window.visualViewport?.addEventListener('resize', this._onResize);
     window.addEventListener('pointermove', this._onPointerMove);
 
     this._onResize();
@@ -111,6 +113,7 @@ export class Renderer {
   }
 
   _onPointerMove(event) {
+    if (event.pointerType === 'touch') return;
     // Нормализуем в диапазон [-1, 1]
     this._pointerTarget.x = (event.clientX / window.innerWidth) * 2 - 1;
     this._pointerTarget.y = (event.clientY / window.innerHeight) * 2 - 1;
@@ -118,7 +121,7 @@ export class Renderer {
 
   _onResize() {
     const w = window.innerWidth;
-    const h = window.innerHeight;
+    const h = window.visualViewport?.height ?? window.innerHeight;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);

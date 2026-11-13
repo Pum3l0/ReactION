@@ -1,4 +1,5 @@
 import { computeMixture, computeHeated, checkShiftGoal } from './reactionEngine.js';
+import { transferContents, removeIons, extractIron } from './operations.js';
 import { REAGENTS } from '../../data/reactions.js';
 import {
   tintLiquid,
@@ -22,6 +23,7 @@ export class LabState {
   constructor(lab, task) {
     this.lab = lab;
     this.task = task;              // может быть null (режим-полигон)
+    this.gasMeshes = new Map();
     this.gasSprites = new Map();   // vesselId -> tick
     this.steamTickers = new Map(); // vesselId -> tick
     this.heating = new Set();      // id сосудов, стоящих на горелке
@@ -38,14 +40,14 @@ export class LabState {
     const key = vessel.reagentIds.join('+') + '|' + result.reactions.map((r) => r.formula ?? r.product ?? '').join(',');
     if (this._lastLogKey === key) return;
     this._lastLogKey = key;
-    const reacted = result.reactions.filter((r) => r.precipitate || r.gas || r.neutral);
+    const reacted = result.reactions.filter((r) => r.precipitate || r.gas || r.neutral || r.thermal);
     if (!reacted.length) return;
     this.log.push({
       vessel: vessel.id,
       reagentIds: [...vessel.reagentIds],
       reactions: reacted.map((r) => ({
         kind: r.precipitate ? 'precipitate' : r.gas ? 'gas' : 'neutral',
-        formula: r.formula,
+        formula: r.equation ?? r.formula ?? r.toFormula,
         name: r.name,
         product: r.product,
       })),
@@ -72,6 +74,7 @@ export class LabState {
     const vessel = this.lab.getVessel(vesselId);
     if (!vessel) return { ok: false, reason: 'Нет такого сосуда' };
 
+    if (!REAGENTS[reagentId] || !Number.isFinite(amount) || amount <= 0) return { ok: false, reason: 'Недопустимый реагент или объём' };
     const free = vessel.capacity - vessel.volume;
     if (free <= 0) return { ok: false, reason: 'Сосуд полон' };
 
@@ -92,14 +95,8 @@ export class LabState {
     if (!from || !to || from.isEmpty) return { ok: false, reason: 'Сосуд пуст' };
     if (from.id === to.id) return { ok: false, reason: 'Это один и тот же сосуд' };
 
-    let movedAny = 0;
-    for (const c of from.contents) {
-      const added = to.add({ id: c.id, phase: c.phase }, c.amount);
-      movedAny += added;
-    }
+    const movedAny = transferContents(from, to);
     if (movedAny <= 0) return { ok: false, reason: 'В приёмнике нет места' };
-
-    from.clear();
     this._refresh(from);
     this._refresh(to);
     return { ok: true, moved: movedAny };
@@ -118,7 +115,14 @@ export class LabState {
     setLiquidLevel(vessel.liquid, 0, 0.2);
     tintLiquid(vessel.liquid, 0xdfe9f0, 0.2);
     if (vessel.solid) updateSolidGeometry(vessel.solid, 0);
-    this.lastResult = null;
+    this._stopGas(vesselId);
+    vessel.result = null;
+    vessel.heated = null;
+    if (this.lastVesselId === vesselId) {
+      this.lastResult = null;
+      this.lastHeated = null;
+      this.lastVesselId = null;
+    }
   }
 
   /** Показать струйку перелива между двумя сосудами. */
@@ -154,7 +158,7 @@ export class LabState {
     this.lab.flame.setOn(true);
 
     // Пар, если есть жидкость
-    if (!this.steamTickers.has(vesselId)) {
+    if (vessel.hasLiquid && !this.steamTickers.has(vesselId)) {
       const { tick } = spawnSteam(vessel.group, (pts) => {
         pts.geometry.dispose();
         pts.material.dispose();
@@ -175,8 +179,20 @@ export class LabState {
    * Возвращает список дескрипторов (для надписи сверху).
    */
   _applyHeat(vessel) {
-    const heated = computeHeated(vessel.reagentIds);
+    const heated = computeHeated(vessel.contents);
+    this.lastHeated = null;
+    vessel.heated = null;
     if (!heated.changed) return [];
+    // Retain a qualitative transformed state instead of regenerating the
+    // original precipitate on the next refresh.
+    for (const r of heated.reactions) {
+      if (r.pair) removeIons(vessel.contents, r.pair, REAGENTS);
+      if (r.reagentId) {
+        for (const c of vessel.contents.filter((c) => c.id === r.reagentId)) {
+          c.processed = true; c.ions = [];
+        }
+      }
+    }
 
     // Применяем ВСЕ найденные реакции (их обычно 1–2).
     // Берём самую наглядную для цвета/осадка, газ пускаем отдельно.
@@ -207,6 +223,10 @@ export class LabState {
       this._startGas(vessel, color, true); // force: перезапускаем поток газа
     }
 
+    vessel.heated = heated;
+    vessel.result = { ...computeMixture(vessel.contents), reactions: heated.reactions };
+    this.lastResult = vessel.result;
+    this._logReaction(vessel, vessel.result);
     this.lastHeated = heated;
     this.lastVesselId = vessel.id;
     return heated.reactions;
@@ -237,11 +257,14 @@ export class LabState {
     }
 
     // 3. Химреакция по всему содержимому
-    const result = computeMixture(vessel.reagentIds);
+    const result = computeMixture(vessel.contents);
+    vessel.heated = null;
+    this.lastHeated = null;
+    vessel.result = result;
     this.lastResult = result;
     this.lastVesselId = vessel.id;
 
-    if (result.solutionColor) tintLiquid(vessel.liquid, result.solutionColor);
+    tintLiquid(vessel.liquid, result.solutionColor);
 
     clearPrecipitate(vessel.group);
     const precip = result.reactions.find((r) => r.precipitate && r.color);
@@ -251,21 +274,36 @@ export class LabState {
 
     const gas = result.reactions.find((r) => r.gas);
     if (gas) this._startGas(vessel, gas.bubbles);
+    else this._stopGas(vessel.id);
 
     // Пишем реакцию в журнал опытов
     this._logReaction(vessel, result);
+  }
+
+  _stopGas(vesselId) {
+    const mesh = this.gasMeshes.get(vesselId);
+    if (mesh) {
+      mesh.removeFromParent();
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+    this.gasMeshes.delete(vesselId);
+    this.gasSprites.delete(vesselId);
   }
 
   _startGas(vessel, color, force = false) {
     // Обычно один поток газа на сосуд, но принудительно (нагрев)
     // перезапускаем — иначе видимого изменения не будет.
     if (this.gasSprites.has(vessel.id) && !force) return;
+    this._stopGas(vessel.id);
     const { mesh, tick } = spawnGas(vessel.group, color, vessel, (m) => {
       m.geometry.dispose();
       m.material.dispose();
       vessel.group.remove(m);
       this.gasSprites.delete(vessel.id);
+      this.gasMeshes.delete(vessel.id);
     });
+    this.gasMeshes.set(vessel.id, mesh);
     this.gasSprites.set(vessel.id, tick);
   }
 
@@ -277,23 +315,23 @@ export class LabState {
     const vessel = this.lab.getVessel(vesselId);
     if (!vessel || vessel.isEmpty) return { ok: false, reason: 'Сосуд пуст' };
 
-    const result = computeMixture(vessel.reagentIds);
+    const result = computeMixture(vessel.contents);
     const precip = result.reactions.find((r) => r.precipitate && r.formula);
-    if (!precip) return { ok: false, reason: 'В сосуде нет осадка для фильтрования' };
+    const insoluble = vessel.contents.filter((c) => ['caco3', 'cuo', 'fe2o3'].includes(c.id) && !c.processed);
+    if (!vessel.hasLiquid || (!precip && !insoluble.length)) return { ok: false, reason: 'Нужна суспензия: фильтр не отделяет растворённые соли от воды.' };
+    if (insoluble.length && result.reactions.some((r) => r.neutral || r.gas)) {
+      return { ok: false, reason: 'Разделение реагирующей смеси этой моделью не поддерживается.' };
+    }
+    const separated = precip ?? REAGENTS[insoluble[0].id];
+    vessel.contents = vessel.contents.filter((c) => !insoluble.includes(c));
 
-    // Осадок уходит на фильтр: убираем его визуально и осветляем раствор.
-    clearPrecipitate(vessel.group);
-    // Фильтрат — цвета оставшихся растворённых ионов (обычно бесцветный).
-    const dissolved = vessel.contents
-      .map((c) => REAGENTS[c.id])
-      .find((r) => r?.color && !r.tags?.includes('metal'));
-    tintLiquid(vessel.liquid, dissolved?.color ?? 0xe8f2ff);
-
-    // Материальный след: на столе появляется воронка с осадком на фильтре.
-    this.lab.strainer?.setPrecipitate(precip.color, precip.name ?? precip.formula);
-
-    vessel.filtrate = precip.formula;
-    return { ok: true, precipitate: precip.name ?? precip.formula };
+    // Complete removal of the modelled precipitates, including their ions.
+    // This is a qualitative operation; no residual concentration is claimed.
+    const precipitates = result.reactions.filter((r) => r.precipitate);
+    removeIons(vessel.contents, precipitates.flatMap((r) => r.pair), REAGENTS);
+    this._refresh(vessel);
+    this.lab.strainer?.setPrecipitate(separated.color ?? 0xf2f2ee, separated.name ?? separated.formula);
+    return { ok: true, precipitate: separated.name ?? separated.formula };
   }
 
   /**
@@ -305,9 +343,9 @@ export class LabState {
     if (!vessel || vessel.isEmpty) return { ok: false, reason: 'Сосуд пуст' };
 
     const before = vessel.contents.length;
-    const metalIds = ['fe', 'zn'];
+    const metalIds = ['fe'];
     const hadMetal = vessel.contents.some((c) => metalIds.includes(c.id));
-    vessel.contents = vessel.contents.filter((c) => !metalIds.includes(c.id));
+    vessel.contents = extractIron(vessel.contents);
     if (!hadMetal) return { ok: false, reason: 'Магниту тут нечего притягивать' };
 
     const removed = before - vessel.contents.length;
@@ -319,7 +357,7 @@ export class LabState {
     } else {
       this.empty(vesselId);
     }
-    return { ok: true, removed: removed * 6 };
+    return { ok: true, removed };
   }
 
   update(dt, elapsed) {
@@ -331,15 +369,11 @@ export class LabState {
   /** Проверить задание (если оно есть). */
   checkGoal() {
     if (!this.task) return { ok: null, reason: 'Режим-полигон: заданий нет.' };
-    // Задания на нагрев проверяются по результату термической реакции
-    if (this.task.goal?.kind === 'heat') {
-      if (!this.lastHeated) {
-        return { ok: false, reason: 'Вещество ещё не нагревали.' };
-      }
-      return checkShiftGoal(this.task, this.lastHeated);
-    }
-    if (!this.lastResult) return { ok: false, reason: 'Пока ничего не произошло.' };
-    return checkShiftGoal(this.task, this.lastResult);
+    const vessel = this.lab.getVessel(this.lastVesselId);
+    if (!vessel || vessel.isEmpty) return { ok: false, reason: 'Сначала выполни опыт в сосуде.' };
+    const result = this.task.goal?.kind === 'heat' ? vessel.heated : vessel.result;
+    if (!result) return { ok: false, reason: 'В текущем сосуде нет результата нужного опыта.' };
+    return checkShiftGoal(this.task, result);
   }
 }
 

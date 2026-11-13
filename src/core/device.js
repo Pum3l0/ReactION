@@ -3,8 +3,7 @@
  *
  * Задача:
  *  - понять, что за устройство (телефон / планшет / десктоп);
- *  - на телефоне в вертикальной ориентации показать экран
- *    «поверни горизонтально» (в портрете лаборатория не помещается);
+ *  - синхронизировать доступную высоту, включая экранную клавиатуру;
  *  - сообщать игре о смене ориентации, чтобы 3D-сцены пересчитали камеру.
  *
  * Никакого UA-снаффинга «на глазок»: ориентируемся на размеры экрана и
@@ -54,46 +53,33 @@ export function isPhone() {
 }
 
 /**
- * Управляет экраном «поверни телефон».
+ * Следит за размерами без блокировки портретной ориентации.
  *
  * @param {{onChange?: (info: {device, orientation, needsRotate}) => void}} options
  * @returns {{destroy: () => void, info: () => object}}
  */
 export function initDeviceWatcher({ onChange } = {}) {
-  const hintEl = document.getElementById('rotate-hint');
-
   let last = '';
-
   function evaluate() {
     const device = detectDevice();
     const orientation = getOrientation();
-    // Повернуть нужно только телефон в портрете
-    const needsRotate = device === DEVICE.PHONE && orientation === 'portrait';
-
-    if (hintEl) hintEl.hidden = !needsRotate;
-
-    const info = { device, orientation, needsRotate };
+    // Both orientations are usable. Never cover the UI with a rotation gate.
+    document.documentElement.style.setProperty('--app-height', `${window.visualViewport?.height ?? window.innerHeight}px`);
+    const info = { device, orientation, needsRotate: false };
     const key = `${device}|${orientation}`;
-    if (key !== last) {
-      last = key;
-      onChange?.(info);
-    }
+    if (key !== last) { last = key; onChange?.(info); }
     return info;
   }
-
-  // resize ловит и смену ориентации, и поворот окна на десктопе.
-  // orientationchange нужен как подстраховка для старых мобильных браузеров.
-  const handler = () => evaluate();
-  window.addEventListener('resize', handler);
-  window.addEventListener('orientationchange', handler);
-
+  window.addEventListener('resize', evaluate);
+  window.addEventListener('orientationchange', evaluate);
+  window.visualViewport?.addEventListener('resize', evaluate);
   evaluate();
-
   return {
     info: evaluate,
     destroy() {
-      window.removeEventListener('resize', handler);
-      window.removeEventListener('orientationchange', handler);
+      window.removeEventListener('resize', evaluate);
+      window.removeEventListener('orientationchange', evaluate);
+      window.visualViewport?.removeEventListener('resize', evaluate);
     },
   };
 }
