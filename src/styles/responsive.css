@@ -129,3 +129,54 @@ button { touch-action: manipulation; }
 @media (max-width: 1024px) and (pointer: coarse), (max-width: 600px) {
   .window:not(.is-maximized) { left: max(8px, env(safe-area-inset-left)) !important; top: max(8px, env(safe-area-inset-top)) !important; width: calc(100% - 16px); }
 }
+
+/* Mobile-only additions. Desktop reference windows and tutorial retain their layout. */
+.mobile-help { display: none; }
+.mobile-reference {
+  position: fixed; inset: 0; bottom: auto;
+  height: var(--app-height, 100dvh); z-index: 2000;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--md-surface-container-lowest); color: var(--md-on-surface);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.mobile-reference-head { display: flex; gap: 4px; align-items: center; padding: 6px; flex-shrink: 0; border-bottom: 1px solid var(--md-outline-variant); }
+.mobile-reference-head nav { display: flex; flex: 1; min-width: 0; gap: 4px; overflow-x: auto; }
+.mobile-reference .btn { min-width: 44px; min-height: 44px; padding: 8px 12px; flex-shrink: 0; font: 0.85rem var(--font-ui); }
+.mobile-reference [aria-pressed="true"] { color: var(--md-on-primary); background: var(--md-primary); }
+.mobile-reference-tools { display: flex; align-items: center; flex-shrink: 0; gap: 6px; padding: 4px 8px; flex-wrap: wrap; }
+.mobile-reference-tools span { font: 0.75rem var(--font-ui); color: var(--md-on-surface-variant); }
+.mobile-reference-tools output { font: 0.8rem var(--font-mono); min-width: 3rem; }
+.mobile-reference-viewport { flex: 1; min-height: 0; overflow: auto; touch-action: none; overscroll-behavior: contain; }
+.mobile-reference-sheet { display: grid; place-items: center; }
+.mobile-reference img { max-width: none; max-height: none; flex-shrink: 0; user-select: none; -webkit-user-drag: none; }
+.mobile-reference-error { padding: 12px; }
+.mobile-reference-error[hidden] { display: none; }
+.onboarding.is-mobile-onboarding { pointer-events: auto; z-index: 1500; height: var(--app-height, 100dvh); bottom: auto; }
+.is-mobile-onboarding .onboarding-tip { max-width: none; overflow-y: auto; transition: none; z-index: 2; }
+.is-mobile-onboarding .onboarding-spot { transition: none; z-index: 1; }
+.is-mobile-onboarding .onboarding-actions { position: sticky; bottom: 0; background: rgba(20,26,34,0.98); }
+.is-mobile-onboarding .onboarding-actions button { min-height: 44px; padding: 10px 14px; }
+@media (max-width: 1024px) and (pointer: coarse) {
+  .mobile-help { display: inline-flex; align-items: center; }
+  /* Warehouse reference buttons must stay above the report instead of behind it. */
+  #screen-level .marker { z-index: 15; top: auto; bottom: max(8px, env(safe-area-inset-bottom)); min-height: 44px; }
+  #screen-level .marker--mendeleev { left: 8px; }
+  #screen-level .marker--solubility { left: auto; right: 8px; }
+  #screen-level .report-panel { bottom: calc(60px + env(safe-area-inset-bottom)); }
+  #screen-level .marker-caption { position: static; font-size: 0.75rem; }
+}
+@media (max-width: 1024px) and (pointer: coarse) {
+  #screen-level .marker-dot { display: none; }
+  #screen-level .marker-caption, #screen-level .marker:hover .marker-caption { display: flex; align-items: center; min-height: 44px; opacity: 1; transform: none; }
+}
+@media (max-width: 1024px) and (pointer: coarse) {
+  #screen-level .marker { bottom: calc(60px + env(safe-area-inset-bottom)); }
+  #screen-level .report-panel { bottom: calc(116px + env(safe-area-inset-bottom)); }
+  #screen-level :is(.level-back, .level-other, .report-answer) { bottom: max(8px, env(safe-area-inset-bottom)); width: calc((100% - 32px) / 3); min-height: 44px; padding: 6px 4px; font-size: 0.85rem; white-space: nowrap; }
+  #screen-level .level-back { left: 8px; }
+  #screen-level .level-other { left: calc((100% - 32px) / 3 + 16px); }
+  #screen-level .report-answer { left: auto; right: 8px; }
+  #screen-level .scene-tip { display: none; }
+  #screen-level .report-npc { max-height: 30%; overflow-y: auto; flex-shrink: 0; }
+  #screen-level .format-hint { bottom: calc(116px + env(safe-area-inset-bottom)); left: 8px; right: 8px; max-width: none; max-height: 35%; overflow-y: auto; z-index: 30; }
+}

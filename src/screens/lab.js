@@ -1,3 +1,4 @@
+import { isMobileReference } from '../ui/mobileReference.js';
 import * as THREE from 'three';
 import gsap from 'gsap';
 import { buildLab, placeReagents } from '../core/three/lab/labScene.js';
@@ -65,6 +66,7 @@ export function labScreen(container, ctx) {
       '<button class="btn btn--ghost" data-action="tables">📋 Таблицы</button>' +
       '<button class="btn btn--ghost" data-action="journal">📓 Журнал</button>' +
       '<button class="btn btn--ghost" data-action="reset">⟳ Слить всё</button>' +
+      '<button class="btn btn--ghost mobile-help" data-action="help" aria-label="Повторить обучение">? Помощь</button>' +
     '</div>' +
 
     // Журнал опытов (панель справа, скрыта)
@@ -443,6 +445,7 @@ export function labScreen(container, ctx) {
       content: '<img class="window-img" src="/textures/props/mendeleevtab.webp" alt="Таблица Менделеева">',
       x: window.innerWidth * 0.40, y: 80,
     });
+    if (isMobileReference()) return;
     w.openWindow('solubility', {
       title: 'Таблица растворимости',
       content: '<img class="window-img" src="/textures/props/rastvortable.webp" alt="Таблица растворимости">',
@@ -805,6 +808,7 @@ export function labScreen(container, ctx) {
       return;
     }
     if (event.target.closest('[data-action="tables"]')) { openTables(); return; }
+    if (event.target.closest('[data-action="help"]')) { startOnboarding(true); return; }
     if (event.target.closest('[data-action="journal"]')) { renderJournal(); return; }
     if (event.target.closest('[data-action="journal-close"]')) { els.journal.hidden = true; return; }
     if (event.target.closest('[data-action="reset"]')) {
@@ -840,21 +844,29 @@ export function labScreen(container, ctx) {
   window.addEventListener('pointercancel', onPointerUp);
 
   /** Онбординг: короткие подсказки при первом заходе в лабораторию. */
-  function startOnboarding() {
+  function startOnboarding(force = false) {
     const key = isSandbox() ? 'lab-sandbox' : 'lab-shift';
     onboarding?.destroy();
-    onboarding = createOnboarding(key, [
+    const desktopSteps = [
       { target: '.lab-panel-toggle', title: 'Шаг 1', text: 'Открой панель «Реактивы» — там все вещества.' },
       { target: '.lab-shelf, .lab-panel', title: 'Шаг 2', text: 'Выбери вещество (или перетащи его прямо на сосуд).' },
       { target: '.lab-vessels', title: 'Шаг 3', text: 'Кликни по сосуду, чтобы налить. 🔥 — нагрев, ⧗ — фильтр, 🧲 — магнит.' },
       { target: '.lab-task', title: 'Шаг 4', text: 'В разделе «Смена» здесь задание мастера — выполни его и нажми «Проверить».' },
-    ], container);
+    ];
+    const mobileSteps = [
+      { target: '.lab-panel-toggle', title: '1 · Реактивы', text: 'Открой «Реактивы». Список прокручивается пальцем; название или формулу можно найти поиском. Касание вещества открывает выбор сосуда.' },
+      { target: '.lab-vessels', title: '2 · Посуда и инструменты', text: 'Выбери сосуд в появившейся карточке. Нижнюю ленту можно двигать влево и вправо: 🔥 — нагрев, ⧗ — фильтр, 🧲 — магнит.' },
+      ...(isSandbox() ? [] : [{ target: '.lab-task', title: '3 · Задание', text: 'Разверни задание кнопкой «+». Здесь цель опыта и кнопка «Проверить». Сворачивай карточку, чтобы видеть стол.' }]),
+      { target: '.lab-topbar', title: 'Справочники и помощь', text: 'Верхняя лента тоже прокручивается. В «Таблицах» переключай справочники, увеличивай их двумя пальцами и перемещай изображение. Здесь же журнал и повтор обучения.' },
+    ];
+    onboarding = createOnboarding(key, mobile ? mobileSteps : desktopSteps, container, { force });
     onboarding.start();
   }
 
   setupScene();
   renderTask();
   buildPanel();
+  if (mobile) requestAnimationFrame(() => { if (state) startOnboarding(); });
 
   return {
     onShow() {
@@ -869,6 +881,7 @@ export function labScreen(container, ctx) {
       startOnboarding();
     },
     onHide() {
+      onboarding?.destroy();
       teardownScene();
       windows?.closeAll();
       panel?.destroy();

@@ -1,3 +1,4 @@
+import { openMobileReference } from '../ui/mobileReference.js';
 import { generateOrbitalTask, distributeElectrons } from '../data/electronConfig.js';
 import { AtomModel } from '../scenes/atomModel.js';
 import * as THREE from 'three';
@@ -443,6 +444,7 @@ export function orbitalScreen(container, ctx) {
       return;
     }
     if (event.target.closest('[data-action="periodic"]')) {
+      if (openMobileReference(container, 'mendeleev')) return;
       container.querySelector('[data-periodic-modal]').hidden = false;
       return;
     }

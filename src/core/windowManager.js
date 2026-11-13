@@ -1,3 +1,4 @@
+import { openMobileReference, closeMobileReference } from '../ui/mobileReference.js';
 /**
  * Оконный менеджер в стиле "как в винде".
  *
@@ -23,6 +24,8 @@ export class WindowManager {
    * @param {{title: string, content: HTMLElement|string, x?: number, y?: number}} options
    */
   openWindow(type, { title, content, x = 200, y = 120 }) {
+    const mobile = openMobileReference(this.container, type);
+    if (mobile) return mobile;
     // Одно окно на тип: если открыто — просто поднять и вернуть
     if (this.open.has(type)) {
       this.bringToFront(this.open.get(type));
@@ -141,6 +144,7 @@ export class WindowManager {
   }
 
   closeAll() {
+    closeMobileReference(this.container);
     for (const type of [...this.open.keys()]) this.closeWindow(type);
   }
 }

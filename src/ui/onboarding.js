@@ -14,7 +14,8 @@ const STORAGE_KEY = 'reaction.onboarding.v1';
 
 function loadSeen() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
   }
@@ -39,16 +40,17 @@ export function isOnboarded(key) {
  * @param {Array<{target: string, text: string, title?: string}>} steps
  * @param {HTMLElement} host — куда вставлять оверлей
  */
-export function createOnboarding(key, steps, host) {
-  if (isOnboarded(key) || !steps?.length) {
+export function createOnboarding(key, steps, host, { force = false } = {}) {
+  if ((!force && isOnboarded(key)) || !steps?.length) {
     return { start() {}, destroy() {}, skip() {} };
   }
 
   let index = 0;
+  let ended = false;
   const overlay = document.createElement('div');
   overlay.className = 'onboarding';
   overlay.innerHTML =
-    '<div class="onboarding-tip" data-tip>' +
+    '<div class="onboarding-tip" role="dialog" aria-label="Знакомство с лабораторией" data-tip>' +
       '<div class="onboarding-title" data-title></div>' +
       '<div class="onboarding-text" data-text></div>' +
       '<div class="onboarding-actions">' +
@@ -66,9 +68,10 @@ export function createOnboarding(key, steps, host) {
   const nextBtn = overlay.querySelector('[data-next]');
 
   function show() {
+    if (ended || !steps[index]) return;
     const step = steps[index];
     const target = host.querySelector(step.target);
-    if (!target) { next(); return; }
+    if (!target || !target.getClientRects().length) { next(); return; }
 
     const r = target.getBoundingClientRect();
     spot.style.left = r.left - 8 + 'px';
@@ -80,6 +83,25 @@ export function createOnboarding(key, steps, host) {
     textEl.textContent = step.text;
     nextBtn.textContent = index === steps.length - 1 ? 'Понятно' : 'Далее';
 
+    const mobile = window.matchMedia('(max-width: 1024px) and (pointer: coarse)').matches;
+    overlay.classList.toggle('is-mobile-onboarding', mobile);
+    if (mobile) {
+      const height = window.visualViewport?.height ?? window.innerHeight;
+      const width = window.innerWidth;
+      const top = Math.max(8, r.top - 6);
+      const left = Math.max(8, r.left - 6);
+      spot.style.left = left + 'px'; spot.style.top = top + 'px';
+      spot.style.width = Math.max(0, Math.min(width - 8, r.right + 6) - left) + 'px';
+      spot.style.height = Math.max(0, Math.min(height - 8, r.bottom + 6) - top) + 'px';
+      tip.style.left = '12px';
+      tip.style.width = (width - 24) + 'px';
+      tip.style.maxHeight = Math.max(100, height - 24) + 'px';
+      const tipHeight = tip.getBoundingClientRect().height;
+      const preferredTop = r.top > height / 2 ? 12 : height - tipHeight - 12;
+      tip.style.top = Math.max(12, Math.min(preferredTop, height - tipHeight - 12)) + 'px';
+      return;
+    }
+    tip.style.width = ''; tip.style.maxHeight = '';
     // Позиция подсказки: справа или слева от цели
     const tipW = 300;
     let left = r.right + 20;
@@ -95,10 +117,14 @@ export function createOnboarding(key, steps, host) {
     show();
   }
 
-  function finish() {
-    markSeen(key);
+  function destroy() {
+    ended = true;
+    window.removeEventListener('resize', show);
+    window.visualViewport?.removeEventListener('resize', show);
     overlay.remove();
   }
+
+  function finish() { markSeen(key); destroy(); }
 
   overlay.addEventListener('click', (e) => {
     if (e.target.closest('[data-next]')) next();
@@ -106,10 +132,11 @@ export function createOnboarding(key, steps, host) {
   });
 
   window.addEventListener('resize', show);
+  window.visualViewport?.addEventListener('resize', show);
 
   return {
     start() { index = 0; show(); },
     skip() { finish(); },
-    destroy() { window.removeEventListener('resize', show); overlay.remove(); },
+    destroy,
   };
 }

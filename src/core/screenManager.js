@@ -1,3 +1,4 @@
+import { closeMobileReference } from '../ui/mobileReference.js';
 /**
  * Менеджер экранов.
  *
@@ -37,6 +38,7 @@ export class ScreenManager {
 
     if (this.current) {
       const prev = this.screens.get(this.current);
+      closeMobileReference(prev.el);
       prev.el.classList.remove('is-active');
       prev.instance?.onHide?.();
     }
