@@ -56,6 +56,10 @@ export const IONS = {
  *   tags   — метки: 'acid', 'base', 'salt', 'indicator', 'metal'
  * ------------------------------------------------------------------------ */
 export const REAGENTS = {
+  // Prepared aqueous solutions: the presentation experiment needs no extra water.
+  bacl2_solution: { formula: 'BaCl2', name: 'хлорид бария (водный раствор) — демо', color: null, state: 'liquid', tags: ['salt'], ions: ['Ba', 'Cl'] },
+  na2so4_solution: { formula: 'Na2SO4', name: 'сульфат натрия (водный раствор) — демо', color: null, state: 'liquid', tags: ['salt'], ions: ['Na', 'SO4'] },
+
   // --- Вода ---
   water:  { formula: 'H2O',    name: 'вода',                 color: null,     state: 'liquid', tags: [], ions: [] },
 
@@ -105,9 +109,12 @@ export const REAGENTS = {
   litmus:          { formula: 'лакмус',   name: 'лакмус (бумага)', color: 0x9a86c6, state: 'solid',  tags: ['indicator'], form: 'paper',    ions: [] },
   methylorange:    { formula: 'мет.оранж', name: 'метилоранж',  color: 0xf2c14e, state: 'liquid', tags: ['indicator'], form: 'solution', ions: [] },
 
-  // --- Металлы: магнитное разделение; вытеснение пока не моделируется ---
-  zn:     { formula: 'Zn',     name: 'цинк (гранулы)',       color: 0x8b939c, state: 'solid',  tags: ['metal'], ions: ['Zn'] },
-  fe:     { formula: 'Fe',     name: 'железо (стружка)',     color: 0x6b6b6b, state: 'solid',  tags: ['metal'], ions: ['Fe2'] },
+  // --- Простые вещества: только явно перечисленные сценарии ---
+  mg: { formula: 'Mg', name: 'магний (лента)', color: 0xbfc5c9, state: 'solid', tags: ['metal', 'element'], ions: [] },
+  cu: { formula: 'Cu', name: 'медь', color: 0xb87333, state: 'solid', tags: ['metal', 'element'], ions: [] },
+  sulfur: { formula: 'S', name: 'сера (порошок)', color: 0xe5cf40, state: 'solid', tags: ['element'], ions: [] },
+  zn:     { formula: 'Zn',     name: 'цинк (гранулы)',       color: 0x8b939c, state: 'solid',  tags: ['metal', 'element'], ions: ['Zn'] },
+  fe:     { formula: 'Fe',     name: 'железо (стружка)',     color: 0x6b6b6b, state: 'solid',  tags: ['metal', 'element'], ions: ['Fe2'] },
 };
 
 /* --------------------------------------------------------------------------
@@ -288,6 +295,38 @@ export function reagentsByTag(tag) {
 }
 
 /** Все id реагентов. */
+export const DEMO_REAGENT_IDS = ['bacl2_solution', 'na2so4_solution'];
+
 export function allReagentIds() {
-  return Object.keys(REAGENTS);
+  return [...DEMO_REAGENT_IDS, ...Object.keys(REAGENTS).filter((id) => !DEMO_REAGENT_IDS.includes(id))];
 }
+
+// Reagent-specific scenarios: metal atoms are never treated as dissolved ions.
+// These rules describe observations, not rates, yields or excess reactants.
+export const SUBSTANCE_REACTIONS = [
+  ...[['mg', 'Mg', 'магний'], ['zn', 'Zn', 'цинк'], ['fe', 'Fe', 'железо']].map(([id, formula, name]) => ({
+    reagents: [id, 'hcl'], requiredIons: { hcl: 'H' },
+    gas: true, product: 'H2', bubbles: 0xffffff,
+    name: name + ' реагирует с соляной кислотой: выделяется водород',
+    equation: formula + ' + 2HCl → ' + formula + 'Cl2 + H2↑',
+  })),
+  ...[['mg', 'Mg'], ['zn', 'Zn'], ['fe', 'Fe']].map(([id, formula]) => ({
+    reagents: [id, 'cuso4'], requiredIons: { cuso4: 'Cu' },
+    deposit: true, formula: 'Cu', color: 0xb87333,
+    name: 'выделение металлической меди на поверхности металла',
+    equation: formula + ' + CuSO4 → ' + formula + 'SO4 + Cu',
+  })),
+  {
+    reagents: ['cu', 'agno3'], requiredIons: { agno3: 'Ag' },
+    deposit: true, formula: 'Ag', color: 0xc9cdd1,
+    name: 'выделение металлического серебра на меди',
+    equation: 'Cu + 2AgNO3 → Cu(NO3)2 + 2Ag',
+  },
+];
+
+export const SUBSTANCE_THERMAL = [{
+  reagents: ['fe', 'sulfur'], thermal: true, solidProduct: true, dry: true,
+  toFormula: 'FeS', color: 0x2a2a2a,
+  name: 'железо и сера при нагревании образуют сульфид железа (II)',
+  equation: 'Fe + S --t--> FeS',
+}];

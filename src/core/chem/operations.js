@@ -23,5 +23,5 @@ export function removeIons(contents, ions, reagents) {
 }
 
 export function extractIron(contents) {
-  return contents.filter((c) => c.id !== 'fe');
+  return contents.filter((c) => c.id !== 'fe' || c.processed);
 }

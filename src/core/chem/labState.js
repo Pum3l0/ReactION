@@ -40,13 +40,13 @@ export class LabState {
     const key = vessel.reagentIds.join('+') + '|' + result.reactions.map((r) => r.formula ?? r.product ?? '').join(',');
     if (this._lastLogKey === key) return;
     this._lastLogKey = key;
-    const reacted = result.reactions.filter((r) => r.precipitate || r.gas || r.neutral || r.thermal);
+    const reacted = result.reactions.filter((r) => r.precipitate || r.deposit || r.gas || r.neutral || r.thermal);
     if (!reacted.length) return;
     this.log.push({
       vessel: vessel.id,
       reagentIds: [...vessel.reagentIds],
       reactions: reacted.map((r) => ({
-        kind: r.precipitate ? 'precipitate' : r.gas ? 'gas' : 'neutral',
+        kind: r.precipitate ? 'precipitate' : r.deposit ? 'deposit' : r.gas ? 'gas' : 'neutral',
         formula: r.equation ?? r.formula ?? r.toFormula,
         name: r.name,
         product: r.product,
@@ -187,6 +187,9 @@ export class LabState {
     // original precipitate on the next refresh.
     for (const r of heated.reactions) {
       if (r.pair) removeIons(vessel.contents, r.pair, REAGENTS);
+      if (r.solidProduct) {
+        for (const c of vessel.contents.filter((c) => r.reagents.includes(c.id))) { c.processed = true; c.ions = []; }
+      }
       if (r.reagentId) {
         for (const c of vessel.contents.filter((c) => c.id === r.reagentId)) {
           c.processed = true; c.ions = [];
@@ -200,7 +203,7 @@ export class LabState {
       ?? heated.reactions.find((r) => r.gas)
       ?? heated.reactions[0];
 
-    if (main.decomposes) {
+    if (main.decomposes || main.solidProduct) {
       // Осадок/твёрдое превратилось: убираем облако осадка, перекрашиваем
       clearPrecipitate(vessel.group);
       if (main.color) {
@@ -267,7 +270,7 @@ export class LabState {
     tintLiquid(vessel.liquid, result.solutionColor);
 
     clearPrecipitate(vessel.group);
-    const precip = result.reactions.find((r) => r.precipitate && r.color);
+    const precip = result.reactions.find((r) => (r.precipitate || r.deposit) && r.color);
     if (precip) {
       spawnPrecipitate(vessel.group, precip.color, precip.precipitate === 'weak', vessel);
     }
@@ -344,7 +347,7 @@ export class LabState {
 
     const before = vessel.contents.length;
     const metalIds = ['fe'];
-    const hadMetal = vessel.contents.some((c) => metalIds.includes(c.id));
+    const hadMetal = vessel.contents.some((c) => metalIds.includes(c.id) && !c.processed);
     vessel.contents = extractIron(vessel.contents);
     if (!hadMetal) return { ok: false, reason: 'Магниту тут нечего притягивать' };
 

@@ -1,6 +1,6 @@
 import {
   REAGENTS, SOLUBILITY, INDICATORS,
-  THERMAL, THERMAL_REAGENT,
+  THERMAL, THERMAL_REAGENT, SUBSTANCE_REACTIONS, SUBSTANCE_THERMAL,
 } from '../../data/reactions.js';
 
 /**
@@ -75,6 +75,11 @@ export function computeMixture(input) {
       }
     }
   }
+  if (aqueous) {
+    for (const rule of SUBSTANCE_REACTIONS) {
+      if (matchesSubstances(contents, rule)) reactions.push({ ...rule });
+    }
+  }
   const medium = detectMedium(ions);
   for (const id of reagentIds.filter((id) => INDICATORS[id])) {
     if (aqueous) reactions.push(computeIndicator(id, ions));
@@ -105,9 +110,18 @@ export function computeHeated(input) {
     const rule = THERMAL_REAGENT[c.id];
     if (rule && !c.processed) found.push({ ...rule, thermal: true, reagentId: c.id });
   }
+  for (const rule of SUBSTANCE_THERMAL) {
+    if (matchesSubstances(contents, rule)) found.push({ ...rule });
+  }
   found.sort((a, b) => priority(b) - priority(a));
   const reactions = found.slice(0, 1);
   return { reactions, reagentIds: mixture.reagentIds, changed: reactions.length > 0 };
+}
+
+function matchesSubstances(contents, rule) {
+  if (rule.dry && contents.some((c) => REAGENTS[c.id].state === 'liquid')) return false;
+  return rule.reagents.every((id) => contents.some((c) => c.id === id && !c.processed &&
+    (!rule.requiredIons?.[id] || availableIons(c).includes(rule.requiredIons[id]))));
 }
 
 /** Вес наглядности термической реакции. */
@@ -220,8 +234,10 @@ export function describeResult(result, reagentIds) {
         formula: r.formula,
         color: r.color,
       });
+    } else if (r.deposit) {
+      lines.push({ kind: 'deposit', text: r.name + '. ' + r.equation, formula: r.formula });
     } else if (r.gas) {
-      lines.push({ kind: 'gas', text: r.name + ' — газ', formula: r.product });
+      lines.push({ kind: 'gas', text: r.name + (r.equation ? '. ' + r.equation : ' — газ'), formula: r.product });
     } else if (r.neutral) {
       lines.push({ kind: 'neutral', text: r.name });
     } else if (r.indicator) {
@@ -253,6 +269,10 @@ export function checkShiftGoal(task, result) {
       return hit
         ? { ok: true, reason: 'Получен ' + hit.name + '.' }
         : { ok: false, reason: 'Осадок нужного состава не выпал.' };
+    }
+    case 'deposit': {
+      const hit = rs.find((r) => r.deposit && r.formula === goal.product);
+      return { ok: !!hit, reason: hit ? 'Получен металл: ' + hit.formula + '.' : 'Нужный металл не выделился.' };
     }
     case 'gas': {
       const hit = rs.find((r) => r.gas && r.product === goal.product);

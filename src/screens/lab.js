@@ -282,11 +282,11 @@ export function labScreen(container, ctx) {
   function renderTask() {
     if (isSandbox() || !task) {
       els.task.classList.add('is-sandbox');
-      els.title.textContent = 'Свободный полигон';
+      els.title.textContent = 'Демонстрация: белый BaSO₄';
       els.master.hidden = true;
       els.actions.hidden = true;
       els.brief.textContent = 'Открой «Реактивы» слева, выбирай любые вещества и смешивай — наблюдай, что происходит.';
-      els.status.textContent = '';
+      els.status.textContent = 'Первые два реактива — растворы BaCl₂ и Na₂SO₄. Добавь их в один сосуд: Ba²⁺ + SO₄²⁻ → BaSO₄↓. Затем можно продолжить свободные опыты.';
       els.result.hidden = true;
       return;
     }

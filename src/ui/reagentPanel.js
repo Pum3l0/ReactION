@@ -17,6 +17,7 @@ const CATEGORIES = [
   { id: 'salt', label: 'Соли' },
   { id: 'indicator', label: 'Индикаторы' },
   { id: 'metal', label: 'Металлы' },
+  { id: 'element', label: 'Простые вещества' },
   { id: 'other', label: 'Другое' },
 ];
 
@@ -28,7 +29,7 @@ function vialColorVar(color) {
 /** Определить категорию реагента по тегам. */
 function categoryOf(reagent) {
   const tags = reagent.tags ?? [];
-  for (const c of ['acid', 'base', 'salt', 'indicator', 'metal']) {
+  for (const c of ['acid', 'base', 'salt', 'indicator', 'metal', 'element']) {
     if (tags.includes(c)) return c;
   }
   return 'other';
@@ -129,7 +130,8 @@ export class ReagentPanel {
     const q = this.query;
     return this.ids.filter((id) => {
       const r = REAGENTS[id];
-      if (this.category !== 'all' && categoryOf(r) !== this.category) return false;
+      if (this.category === 'other' && categoryOf(r) !== 'other') return false;
+      if (!['all', 'other'].includes(this.category) && !r.tags.includes(this.category)) return false;
       if (!q) return true;
       return fuzzyMatch(q, r.formula, r.name);
     });

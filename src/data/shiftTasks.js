@@ -16,6 +16,32 @@
 
 export const SHIFT_TASKS = [
   {
+    id: 'demo-baso4', title: 'Демонстрация — Белый осадок',
+    brief: 'Добавь в один сосуд готовые водные растворы хлорида бария и сульфата натрия. Вода уже входит в состав растворов. Что образуется?',
+    goal: { kind: 'precipitate', product: 'BaSO4' },
+    reagents: ['bacl2_solution', 'na2so4_solution'],
+    equation: 'BaCl2 + Na2SO4 → BaSO4↓ + 2NaCl; Ba²⁺ + SO₄²⁻ → BaSO₄↓',
+    observation: 'Белый осадок сульфата бария. Это предусмотренный качественный сценарий для водных растворов.', level: 1,
+  },
+  {
+    id: 'mg-hydrogen', title: 'Магний и кислота',
+    brief: 'Добавь магний к соляной кислоте. Определи выделяющийся газ.',
+    goal: { kind: 'gas', product: 'H2' }, reagents: ['mg', 'hcl'],
+    equation: 'Mg + 2HCl → MgCl2 + H2↑', observation: 'Выделяется водород.', level: 2,
+  },
+  {
+    id: 'iron-copper', title: 'Железо вытесняет медь',
+    brief: 'Раствори сульфат меди в воде и добавь железо. Это выделение металла, а не осаждение малорастворимой соли.',
+    goal: { kind: 'deposit', product: 'Cu' }, reagents: ['water', 'cuso4', 'fe'],
+    equation: 'Fe + CuSO4 → FeSO4 + Cu', observation: 'На поверхности железа выделяется металлическая медь.', level: 2,
+  },
+  {
+    id: 'heat-fes', title: 'Железо и сера',
+    brief: 'Смешай железо с серой и нагрей. Модель показывает получение нового соединения, без расчёта температуры и количества продукта.',
+    goal: { kind: 'heat', product: 'FeS' }, reagents: ['fe', 'sulfur'],
+    equation: 'Fe + S --t--> FeS', observation: 'Образуется тёмный сульфид железа (II).', level: 2,
+  },
+  {
     id: 'dissolve',
     title: 'Задание 1 — Рабочий раствор',
     brief:
@@ -189,6 +215,8 @@ export const SHIFT_TASKS = [
  * Случайное задание — не повторяем уже решённые, пока не исчерпаем набор.
  */
 export function pickShiftTask(excludeIds = [], maxLevel = 3) {
+  const demo = SHIFT_TASKS.find((t) => t.id === 'demo-baso4');
+  if (demo.level <= maxLevel && !excludeIds.includes(demo.id)) return demo;
   const pool = SHIFT_TASKS.filter(
     (t) => t.level <= maxLevel && !excludeIds.includes(t.id),
   );
